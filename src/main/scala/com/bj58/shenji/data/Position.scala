@@ -5,20 +5,24 @@ package com.bj58.shenji.data
  * @author jiangzhenxing
  * @created 2016-10-31
  */
-class Position( val infoid: String,		// 职位ID
-										 val adddate: String,		// 发布时间戳
-										 val scate1: String,		// 一级归属类别，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
-										 val scate2: String,		// 二级归属类别，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
-										 val scate3: String,		// 三级归属类别，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
-										 val effectivedate: String,		// 职位有效截止时间戳
-										 val title: String,		  // 职位标题
-										 val userid: String,		// 用户ID
-										 val postdate: String,	// 最后修改时间戳
-										 val local: String,		  // 职位展现地域，可与hdp_58_common_defaultdb.ds_dict_cmc_displocal关联
-										 val salary: String,		// 最低薪资标示，1：面议 2：1000以下 3：1000-2000 4:2000-3000 5:3000-5000 6:5000-8000 7:8000-12000 8:12000-20000 9:20000-25000 10:25000以上
-										 val education: String,		// 学历要求，1:不限 2:高中 3:技校 4:中专 5:大专 6:本科 7:硕士 8:博士
-										 val experience: String,	// 工作年限，1:不限 4:1年以下 5:1-2年 6:3-5年 7:6-7年 8:8-10年 9:10年以上
-										 val trade: String,		  // 发布职位公司对应行业，244:互联网/电子商务 245:计算机软件 246:计算机硬件 247:IT服务/系统集成 248:通信/电信 
+case class Position( infoid: String,		// 职位ID
+										 
+										 scate1: String,		// 一级归属类别，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
+										 scate2: String,		// 二级归属类别，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
+										 scate3: String,		// 三级归属类别，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
+										 adddate: String,		// 发布时间戳
+										 effectivedate: String,		// 职位有效截止时间戳
+										 postdate: String,	// 最后修改时间戳
+										 
+										 title: String,		  // 职位标题
+										 userid: String,		// 用户ID
+										 
+										 local: String,		  // 职位展现地域，可与hdp_58_common_defaultdb.ds_dict_cmc_displocal关联
+										 salary: String,		// 最低薪资标示，1：面议 2：1000以下 3：1000-2000 4:2000-3000 5:3000-5000 6:5000-8000 7:8000-12000 8:12000-20000 9:20000-25000 10:25000以上
+										 education: String,		// 学历要求，1:不限 2:高中 3:技校 4:中专 5:大专 6:本科 7:硕士 8:博士
+										 experience: String,	// 工作年限，1:不限 4:1年以下 5:1-2年 6:3-5年 7:6-7年 8:8-10年 9:10年以上
+										 
+										 trade: String,		  // 发布职位公司对应行业，244:互联网/电子商务 245:计算机软件 246:计算机硬件 247:IT服务/系统集成 248:通信/电信 
                                             // 249:电子技术/半导体/集成电路 250:仪器仪表/工业自动化 251:财务/审计 252:金融/银行 
                                             // 253:保险 254:贸易/进出口 255:批发/零售 256:快速消费品(食品/饮料等) 257:耐用消费品（家具/家电等） 
                                             // 258:服装/纺织/皮革 259:办公用品及设备 260:钢铁/机械/设备/重工 261:汽车/摩托车 262:医疗/保健/卫生/美容 
@@ -28,11 +32,27 @@ class Position( val infoid: String,		// 职位ID
                                             // 278:交通/运输/物流 279:航天/航空 280:化工/采掘/冶炼 281:能源（电力/水利/矿产） 
                                             // 282:原材料和加工 283:政府/非盈利机构 284:环保 285:农林牧渔 286:多元化集团 3527:人力资源服务 
                                             // 287:其他行业 288:陶瓷卫浴 289:家具灯饰 290:纺织服饰  291：游戏 294:咨询/顾问 295:信托/拍卖 296: 租赁服务
-										 val enttype: String,		// 发布职位公司对应公司性质，1476:私营 1477:国有 1478:股份制 1479:外商独资/办事处 1480:中外合资/合作 1481:上市公司 1482:事业单位 1483:政府机关 1484:非营利机构 1485:个人企业
-										 val fresh: String,		// 是否接受应届生，0：不接受 1：接受
-										 val fuli: String		// 福利保障，1:五险一金,8:包住,10:包吃,9:年底双薪,6:周末双休,5:交通补助,7:加班补助,2:餐补,3:话补,4:房补
-)
+										 enttype: String,		// 发布职位公司对应公司性质，1476:私营 1477:国有 1478:股份制 1479:外商独资/办事处 1480:中外合资/合作 1481:上市公司 1482:事业单位 1483:政府机关 1484:非营利机构 1485:个人企业
+										 fresh: String,		// 是否接受应届生，0：不接受 1：接受
+										 fuli: String,		// 福利保障，1:五险一金,8:包住,10:包吃,9:年底双薪,6:周末双休,5:交通补助,7:加班补助,2:餐补,3:话补,4:房补
+										 additional: String   // 任职要求附加项，552496:会有加班 552497:需要出差 552498:需要管理团队 552499:异地派遣工作
+                  )
 {
+  /**
+   * 用户信息和职位信息进行匹配
+   * 如有多个简历，取差最小的那个
+   * 匹配方法如下：
+   * targetCateid: 目标职位类别ID，加上实际投递的职位类别，匹配时包含为0，不包含为1
+   * targetAreaid: 目标城市，加上实际投递地域，匹配时包含为0，不包含为1
+   * education: 教育程度，1:不限 2:高中 3:技校 4:中专 5:大专 6:本科 7:硕士 8:博士
+   * salary: 		薪资，1：面议 2：1000以下 3：1000-2000 4:2000-3000 5:3000-5000 6:5000-8000 7:8000-12000 8:12000-20000 9:20000-25000 10:25000以上
+   * 				 		如果简历或职位是面议，则差置为1，否则相减
+   * rdoidentity: 个人身份，1:在校学生 0:社会人才 | 与职位要求中的［fresh: 是否接受应届生，0：不接受 1：接受］相匹配
+   * 							如果是在校生，则与fresh相减(即接受应届生为1-1＝0，不接受为1－0＝1)，否则差计为0
+   * experience: 	工作年限，1:不限 4:1年以下 5:1-2年 6:3-5年 7:6-7年 8:8-10年 9:10年以上  （好像没有提供）
+   * 							如果职位要求是不限，则差计为0，否则两者相减
+   */
+  
   /**
    * 产生用于逻辑回归模型的特征
    */
