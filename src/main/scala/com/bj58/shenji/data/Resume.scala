@@ -9,9 +9,9 @@ import java.util.Date
  */
 case class Resume( id: String,				    // 简历ID
                    userid: String,		    // 简历用户ID
-									 targetCateid: String,  // 目标职位类别ID，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
+									 targetCateid: String,  // 目标职位类别ID，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联 eg:2620,2811,2414,2238,2701
 									 targetAreaid: String,	// 目标城市
-									 deliveryCateid: String,// 真实投递类别
+									 deliveryCateid: String,// 真实投递类别 没有为'-'
 									 deliveryAreaid: String,  // 真实投递地域
 									 salary: Int,		        // 期望薪资，1：面议 2：1000以下 3：1000-2000 4:2000-3000 5:3000-5000 6:5000-8000 7:8000-12000 8:12000-20000 9:20000-25000 10:25000以上
 									 nowSalary: Int,		    // 现薪资段，1：面议 2：1000以下 3：1000-2000 4:2000-3000 5:3000-5000 6:5000-8000 7:8000-12000 8:12000-20000 9:20000-25000 10:25000以上

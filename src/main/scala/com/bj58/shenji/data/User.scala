@@ -10,30 +10,49 @@ import scala.collection.mutable.Set
 case class User(
     cookieid: String,
     userid: String,
-    resumes: Seq[Resume] = Seq())
+    resumes: Seq[Resume] = Seq(),
+    categories: Map[String,String],
+    locals: Map[String,String])
 {
   /**
    * 用户信息和职位信息进行匹配
    * 如有多个简历，取差最小的那个
    * 匹配方法如下：
-   * targetCateid: 目标职位类别ID，加上实际投递的职位类别，匹配时包含为0，不包含为1
-   * targetAreaid: 目标城市，加上实际投递地域，匹配时包含为0，不包含为1
+   * targetCate: 目标职位类别，加上实际投递的职位类别
+   * targetArea: 目标城市，加上实际投递地域
    * education: 教育程度，1:不限 2:高中 3:技校 4:中专 5:大专 6:本科 7:硕士 8:博士
    * salary: 		薪资，1：面议 2：1000以下 3：1000-2000 4:2000-3000 5:3000-5000 6:5000-8000 7:8000-12000 8:12000-20000 9:20000-25000 10:25000以上
    * rdoidentity: 个人身份，1:在校学生 0:社会人才 | 与职位要求中的［fresh: 是否接受应届生，0：不接受 1：接受］相匹配
    * workedyears: 	工作年限，0:不限 1:1-3年 2:3-5年 3:5-10年 4:10年以上 5:应届生 6:1年以下
    * 							如果职位要求是不限，则差计为0，否则两者相减
    */
-  def matches(job: Job): Double = 
+  def matches(position: Position): Double = 
   {
+    var mindis = 10000000d
     for (resume ← resumes) {
-      // 职位类别,目标城市,教育程度,薪资，个人身份，工作年限
-      val cate, aread, education, salary, rdoidentity, experience = 0.0
       
-      resume.deliveryCateid
+      // 职位类别距离,地域距离,教育程度,薪资，个人身份，工作年限
+      val disarr = Array(catedDis(resume.targetCateid, position.scate1, position.scate2, position.scate3),
+                         areaDis(resume.targetAreaid, position.local))
 		
     }
     0
+  }
+  
+  /**
+   * 简历中的目标职位类别，加上实际投递的职位类别
+   */
+  def targetCates(resume: Resume): String =
+  {
+    val cates = Set[String]()
+    cates ++= resume.targetCateid.split(",")
+    if (resume.deliveryCateid != "-")
+      cates ++= resume.deliveryCateid.split(",")
+    
+    val fullCates = Set[String]()
+    cates.foreach(cate => fullCates add categories(cate))
+    
+    fullCates.mkString(";")
   }
   
   /**
@@ -43,8 +62,27 @@ case class User(
    */
   def workedyearsDis(workedyears: Int, experience: Int): Double =
   {
-    
-    0
+    val workyear = workedyears match {
+                      case 0 => -1
+                      case 5 => 0
+                      case 6 => 0.5
+                      case 1 => 1
+                      case 2 => 3
+                      case 3 => 7
+                      case 4 => 10
+                      case _ => 5
+                    }
+    val expectyear = experience match {
+                      case 1 => -1
+                      case 4 => 0.5
+                      case 5 => 1
+                      case 6 => 3
+                      case 7 => 6
+                      case 8 => 8
+                      case 9 => 10
+                      case _ => 5
+                    }
+    if (expectyear == -1) 0 else (expectyear - workyear) / 10
   }
   
   /**
@@ -100,7 +138,7 @@ case class User(
     for (tcate ← targetcate.split(";")) {
       val tcates = tcate.split(",")
       val jcates = Array(jobcate1,jobcate2,jobcate3)
-      val dis = arrdis(tcates, jcates)
+      val dis = treedis(tcates, jcates)
       mindis = math.min(mindis, dis)
     }
     mindis / 3d
@@ -121,16 +159,17 @@ case class User(
     {
       val tcates = tcate.split(",")
       val jcates = jcate.split(";")
-      val dis = arrdis(tcates, jcates)
+      val dis = treedis(tcates, jcates)
       mindis = math.min(mindis, dis)
     }
     mindis / 3d
   }
   
   /**
-   * 计算两个数组之间的距离，全部为'-'，数组大小为3
+   * 计算两个类别之间的距离，前面的为大类，后面的为子类，全部为'-'，数组大小为3
+   * 大类不同距离比子类不同距离远
    */
-  def arrdis(a1: Array[String], a2: Array[String]): Double =
+  def treedis(a1: Array[String], a2: Array[String]): Double =
   {
     var dis = 0D
     if (a1(0) == "-") {
