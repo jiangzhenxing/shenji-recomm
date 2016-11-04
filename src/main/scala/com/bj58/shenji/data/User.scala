@@ -1,6 +1,7 @@
 package com.bj58.shenji.data
 
 import scala.collection.mutable.Set
+import com.bj58.shenji.util._
 
 /**
  * 用户信息
@@ -11,8 +12,9 @@ case class User(
     cookieid: String,
     userid: String,
     resumes: Seq[Resume] = Seq(),
-    categories: Map[String,String],
-    locals: Map[String,String])
+    cmcCates: Map[String,String],  // cmc_cate的映射，key为cateid, value为fullcatepaths，以','分隔
+    cmcLocals: Map[String,String]  // cmc_local的映射，key为areaid, value为fullpath，以','分隔
+    )
 {
   /**
    * 用户信息和职位信息进行匹配
@@ -29,14 +31,28 @@ case class User(
   def matches(position: Position): Double = 
   {
     var mindis = 10000000d
+    
     for (resume ← resumes) {
-      
       // 职位类别距离,地域距离,教育程度,薪资，个人身份，工作年限
-      val disarr = Array(catedDis(resume.targetCateid, position.scate1, position.scate2, position.scate3),
-                         areaDis(resume.targetAreaid, position.local))
-		
+      val disarr = Array(catedDis(targetCates(resume), position.scate1, position.scate2, position.scate3),
+                         areaDis(targetAreas(resume), positionAreas(position)),
+                         educationDis(resume.education, position.education),
+                         salaryDis(resume.salary, position.salary),
+                         identityDis(resume.rdoidentity, position.fresh),
+                         workedyearDis(resume.workedyears, position.experience))
+		  val dis = vecmodel(disarr)
+		  mindis = math.min(dis, mindis)
     }
-    0
+    
+    mindis
+  }
+  
+  /**
+   * 职位中的地域，可能有多个，以','分隔
+   */
+  def positionAreas(position: Position) =
+  {
+    position.local.split(",").filter(_ != "-").map(local => cmcLocals(local)).mkString(";")
   }
   
   /**
@@ -49,10 +65,26 @@ case class User(
     if (resume.deliveryCateid != "-")
       cates ++= resume.deliveryCateid.split(",")
     
-    val fullCates = Set[String]()
-    cates.foreach(cate => fullCates add categories(cate))
+    val allCates = Set[String]()
+    cates.foreach(cate => allCates add cmcCates(cate))
     
-    fullCates.mkString(";")
+    allCates.mkString(";")
+  }
+  
+  /**
+   * 简历中的目标职位类别，加上实际投递的职位类别
+   */
+  def targetAreas(resume: Resume): String =
+  {
+    val areas = Set[String]()
+    areas ++= resume.targetAreaid.split(",")
+    if (resume.deliveryAreaid != "-")
+      areas ++= resume.deliveryAreaid.split(",")
+    
+    val allAreas = Set[String]()
+    areas.foreach(area => allAreas add cmcLocals(area))
+    
+    allAreas.mkString(";")
   }
   
   /**
@@ -60,7 +92,7 @@ case class User(
    * 简历: 0:不限 5:应届生 6:1年以下 1:1-3年 2:3-5年 3:5-10年 4:10年以上
    * 职位: 1:不限 4:1年以下 5:1-2年 6:3-5年 7:6-7年 8:8-10年 9:10年以上
    */
-  def workedyearsDis(workedyears: Int, experience: Int): Double =
+  def workedyearDis(workedyears: Int, experience: Int): Double =
   {
     val workyear = workedyears match {
                       case 0 => -1
@@ -166,30 +198,40 @@ case class User(
   }
   
   /**
-   * 计算两个类别之间的距离，前面的为大类，后面的为子类，全部为'-'，数组大小为3
+   * 计算两个类别之间的距离，前面的为大类，后面的为子类，全部为'-'或没有相应的值，a,b的长度至少为1
    * 大类不同距离比子类不同距离远
    */
-  def treedis(a1: Array[String], a2: Array[String]): Double =
+  def treedis(a: Array[String], b: Array[String]): Double =
   {
-    var dis = 0D
-    if (a1(0) == "-") {
+    val a1 = if (a.length > 0) a(0) else "-"
+    val b1 = if (b.length > 0) b(0) else "-"
+    
+    if (a1 == "-") 
       return 0
-    }
-    if (a1(0) != a2(0)) {
-      return if (a2(0) == "-") 2.5 else 3
-    }
-    if (a1(1) == "-") {
+    
+    if (a1 != b1) 
+      return if (b1 == "-") 2.5 else 3
+    
+    
+    val a2 = if (a.length > 1) a(1) else "-"
+    val b2 = if (b.length > 1) b(1) else "-"
+    
+    if (a2 == "-") 
       return 0
-    }
-    if (a1(1) != a2(1)) {
-      return if (a2(1) == "-") 1.5 else 2
-    } 
-    if (a1(2) == "-") {
+    
+    if (a2 != b2) 
+      return if (b2 == "-") 1.5 else 2
+    
+    
+    val a3 = if (a.length > 2) a(2) else "-"
+    val b3 = if (b.length > 2) b(2) else "-"
+    
+    if (a3 == "-") 
       return 0 
-    }
-    if (a1(2) != a2(2)) {
-      return if (a2(2) == "-") 0.5 else 1
-    }
+    
+    if (a3 != b3) 
+      return if (b3 == "-") 0.5 else 1
+    
     0
   }
 }
