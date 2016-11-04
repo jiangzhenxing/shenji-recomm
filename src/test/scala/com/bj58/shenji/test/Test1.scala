@@ -19,8 +19,11 @@ object Test1 {
 //    println(dis + (if ("111" == "-") 1.5 else 2))
 //    println(dis + (if ("-" == "-") 1.5 else 2))
 //    println("Hello!")
-//    val s1 = Array(1,2,3)
-//    val s2 = Array(4,5,6)
+    val s1 = Array(1,2,3)
+    val s2 = Array(4,5,6)
+    
+    (s1 ++: s2 ++: s2).foreach(println)
+    
 //    
 //    for {
 //      a ← s1
