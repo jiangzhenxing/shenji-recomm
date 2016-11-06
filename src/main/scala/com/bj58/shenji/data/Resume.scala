@@ -22,7 +22,7 @@ case class Resume( id: String,				    // 简历ID
 									 complete: Int,		    // 简历完整度,分数，如：70,80
 									 updateDate: Date,		  // 最近更新时间戳
 									 addDate: Date		      // 创建时间戳
-                  )
+                  ) extends Serializable
 {
   
    

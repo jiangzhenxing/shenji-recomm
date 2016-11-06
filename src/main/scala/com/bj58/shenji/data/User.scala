@@ -14,7 +14,7 @@ case class User(
     resumes: Seq[Resume] = Seq(),
     cmcCates: Map[String,String],  // cmc_cate的映射，key为cateid, value为fullcatepaths，以','分隔
     cmcLocals: Map[String,String]  // cmc_local的映射，key为areaid, value为fullpath，以','分隔
-    )
+    ) extends Serializable
 {
   /**
    * 用户信息和职位信息进行匹配

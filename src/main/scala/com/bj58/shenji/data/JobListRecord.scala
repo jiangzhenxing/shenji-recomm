@@ -29,19 +29,18 @@ class JobListRecord(val cookieid: String,   // 用户CookieID
                    val pageno:   String,   // 职位所在页码
                    val position: String,   // 职位所在位置
                    val clicktag: String,   // 点击标示，点击为1，未点击为0
-                   val clicktime: String,  // 点击行为时间戳
-                   val dt: String          // 分区字段
-                   )
+                   val clicktime: String  // 点击行为时间戳
+                   ) extends Serializable
 {
   
 }
 
 object JobListRecord
 {
-  val filed_delim = "\t"
-  def apply(line: String)
+  val field_delim = "\001"
+  def apply(line: String): JobListRecord =
   {
-    val values = line.split(filed_delim)
+    val values = line.split(field_delim)
     new JobListRecord(cookieid = values(0),   // 用户CookieID
                 			userid = values(1),     // 用户ID，未登录状态记录为‘-’
                 			ip = values(2),         // 用户IP
@@ -66,8 +65,7 @@ object JobListRecord
                 			pageno = values(21),     // 职位所在页码
                 			position = values(22),   // 职位所在位置
                 			clicktag = values(23),   // 点击标示，点击为1，未点击为0
-                			clicktime = values(24),  // 点击行为时间戳
-                			dt = values(25)          // 分区字段
+                			clicktime = values(24)  // 点击行为时间戳
                 )
   }
   

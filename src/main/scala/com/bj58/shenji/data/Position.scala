@@ -9,9 +9,9 @@ case class Position( infoid: String,		// 职位ID
 										 scate1: String,		// 一级归属类别，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
 										 scate2: String,		// 二级归属类别，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
 										 scate3: String,		// 三级归属类别，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
-										 adddate: String,		// 发布时间戳
-										 effectivedate: String,		// 职位有效截止时间戳
-										 postdate: String,	// 最后修改时间戳
+//										 adddate: String,		// 发布时间戳
+//										 effectivedate: String,		// 职位有效截止时间戳
+//										 postdate: String,	// 最后修改时间戳
 										 title: String,		  // 职位标题
 										 userid: String,		// 用户ID
 										 local: String,		  // 职位展现地域，可与hdp_58_common_defaultdb.ds_dict_cmc_local.localid关联,可能有多个值
@@ -32,10 +32,9 @@ case class Position( infoid: String,		// 职位ID
 										 fresh: Int,		    // 是否接受应届生，0：不接受 1：接受
 										 fuli: String,		  // 福利保障，1:五险一金,8:包住,10:包吃,9:年底双薪,6:周末双休,5:交通补助,7:加班补助,2:餐补,3:话补,4:房补
 										                    // 数据格式为：1|8|9|4|3|5|7 或 -
-										 additional: String,   // 任职要求附加项，552496:会有加班 552497:需要出差 552498:需要管理团队 552499:异地派遣工作, 
+										 additional: String   // 任职要求附加项，552496:会有加班 552497:需要出差 552498:需要管理团队 552499:异地派遣工作, 
 										                       // 552496|552498 没有为‘-’
-										 click_rate: Double    // 点击率
-                  )
+                  )  extends Serializable
 {
   
   /**
@@ -44,15 +43,13 @@ case class Position( infoid: String,		// 职位ID
    */
   def lrFeatures: Array[Double] = 
   {
-    // 薪资, 学历要求, 工作年限，是否接受应届生,五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作，企业性质one-hot编码
+    // 薪资, 学历要求, 工作年限，是否接受应届生，五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作，企业性质one-hot编码
     Array[Double](salary,education,experience,fresh) ++: fuliFeature ++: additionalFeature ++: enttypeOneHot
   }
-  
   
   /**
    * 产生用于决策树回归模型的特征
    * 公司性质为类别型特征，不需one-hot编码
-   * 
    */
   def dtFeatures: Array[Double] =
   {
@@ -85,7 +82,6 @@ case class Position( infoid: String,		// 职位ID
    * 任职要求附加项特征
    * 552496:会有加班 552497:需要出差 552498:需要管理团队 552499:异地派遣工作
    * 数据格式为：552496|552498 没有为‘-’
-   * 
    */
   def additionalFeature: Array[Double] = 
   {
@@ -96,8 +92,24 @@ case class Position( infoid: String,		// 职位ID
 
 object Position
 {
-  def apply() =
+  def apply(line: String): Position =
   {
-    
+    val field_delim = "\001"
+    val values = line.split(field_delim)
+    Position(infoid = values(0),
+						 scate1 = values(2),
+						 scate2 = values(3),
+						 scate3 = values(4),
+						 title = values(6),
+						 userid = values(7),
+						 local = values(13),
+						 salary = if (values(14) == "-") 1 else values(14).toInt,
+						 education = if (values(15) == "-") 1 else values(15).toInt,
+						 experience = if (values(16) == "-") 1 else values(16).toInt,
+						 trade = values(17),
+						 enttype = values(18),
+						 fresh = values(20).toInt,
+						 fuli = values(19),
+						 additional = values(22))
   }
 }

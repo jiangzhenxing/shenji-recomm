@@ -8,7 +8,8 @@ package com.bj58.shenji.data
 case class Job(
     infoid: String,
     position: Position,
-    enterprise: Enterprise)
+    enterprise: Enterprise
+    ) extends Serializable
 {
   /**
    * 用户信息和职位信息进行匹配

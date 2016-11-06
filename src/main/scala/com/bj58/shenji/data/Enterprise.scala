@@ -36,7 +36,7 @@ case class Enterprise( val id: String,		    // 企业ID
 											 val fuli: String,		  // 企业福利（固定，用于用户勾选），1:五险一金,8:包住,10:包吃,9:年底双薪,6:周末双休,5:交通补助,7:加班补助,2:餐补,3:话补,4:房补
 											 val addfuli: String,		// 企业福利（不固定，用户自己添加） 
 											 val dt: String		      // 分区字段
-)
+) extends Serializable
 {
   
 }

@@ -13,7 +13,7 @@ case class DeliveryRecord( val cookieid: String,		// 用户CookieID
 										       val deliverytime: String,	// 投递时间戳
 										       val slot: String,		    // 推荐位标示，不是来自推荐位的记为‘-’
 										       val dt: String		        // 分区字段
-                          )
+                          ) extends Serializable
 {
   
 }

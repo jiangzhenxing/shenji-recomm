@@ -10,15 +10,19 @@ case class UserActionRecord(cookieid: String,   // 用户CookieID
 											      clicktime: String,	// 点击事件时间戳
 											      userid: String,		  // 用户ID，未登录状态记录为‘-’
 											      infoid: String		  // 职位ID
-                           )
-{
-  
-}
+                           ) 
+extends Serializable
 
 object UserActionRecord 
 {
-  def apply()
+  def apply(line: String): UserActionRecord =
   {
-    
+    val values = line.split("\001")
+    UserActionRecord( cookieid = values(0),
+                      clicktag = values(1),
+                      clicktime = values(2),
+                      userid = values(3),
+                      infoid = values(4) 
+                    )
   }
 }
