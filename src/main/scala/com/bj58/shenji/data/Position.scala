@@ -92,6 +92,43 @@ case class Position( infoid: String,		// 职位ID
 
 object Position
 {
+  def apply( infoid: String,		// 职位ID
+						 scate1: String,		// 一级归属类别，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
+						 scate2: String,		// 二级归属类别，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
+						 scate3: String,		// 三级归属类别，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
+						 title: String,		  // 职位标题
+						 userid: String,		// 用户ID
+						 local: String,		  // 职位展现地域，可与hdp_58_common_defaultdb.ds_dict_cmc_local.localid关联,可能有多个值
+						 salary: String,		    // 最低薪资标示，1：面议 2：1000以下 3：1000-2000 4:2000-3000 5:3000-5000 6:5000-8000 7:8000-12000 8:12000-20000 9:20000-25000 10:25000以上
+						 education: String,		// 学历要求，1:不限 2:高中 3:技校 4:中专 5:大专 6:本科 7:硕士 8:博士
+						 experience: String,	  // 工作年限，1:不限 4:1年以下 5:1-2年 6:3-5年 7:6-7年 8:8-10年 9:10年以上
+						 trade: String,		  // 发布职位公司对应行业
+						 enttype: String,		// 发布职位公司对应公司性质，1476:私营 1477:国有 1478:股份制 1479:外商独资/办事处 1480:中外合资/合作 1481:上市公司 1482:事业单位 1483:政府机关 1484:非营利机构 1485:个人企业
+						 fresh: String,		    // 是否接受应届生，0：不接受 1：接受
+						 fuli: String,		  // 福利保障，1:五险一金,8:包住,10:包吃,9:年底双薪,6:周末双休,5:交通补助,7:加班补助,2:餐补,3:话补,4:房补
+						 additional: String   // 任职要求附加项，552496:会有加班 552497:需要出差 552498:需要管理团队 552499:异地派遣工作, 
+           ): Position = 
+  {
+    Position(infoid = infoid,
+						 scate1 = scate1,
+						 scate2 = scate2,
+						 scate3 = scate3,
+						 title = title,
+						 userid = userid,
+						 local = local,
+						 salary = if (salary == "-") 1 else salary.toInt,
+						 education = if (education == "-") 1 else education.toInt,
+						 experience = if (experience == "-") 1 else experience.toInt,
+						 trade = trade,
+						 enttype = enttype,
+						 fresh = if (fresh == "-") 1 else fresh.toInt,
+						 fuli = fuli,
+						 additional = additional)
+  }
+  
+  /**
+   * 从表中解析数据
+   */
   def apply(line: String): Position =
   {
     val field_delim = "\001"
@@ -103,12 +140,12 @@ object Position
 						 title = values(6),
 						 userid = values(7),
 						 local = values(13),
-						 salary = if (values(14) == "-") 1 else values(14).toInt,
-						 education = if (values(15) == "-") 1 else values(15).toInt,
-						 experience = if (values(16) == "-") 1 else values(16).toInt,
+						 salary = values(14),
+						 education = values(15),
+						 experience = values(16),
 						 trade = values(17),
 						 enttype = values(18),
-						 fresh = values(20).toInt,
+						 fresh = values(20),
 						 fuli = values(19),
 						 additional = values(22))
   }
