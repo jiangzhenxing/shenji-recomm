@@ -36,5 +36,11 @@ object Test1 {
 //    "aaa,bbb,ccc,ddd".split(",", 2).foreach { println }
     
     Range(1,16).foreach(dt => println(dt))
+    
+    val a = Array(1,2,3,4)
+    a(0) = 0
+    println(a.mkString(","))
+    
+    Range(10,30,1).foreach(x => println(x/10d))
   }
 }

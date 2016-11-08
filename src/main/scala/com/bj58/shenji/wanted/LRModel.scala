@@ -7,6 +7,7 @@ import com.bj58.shenji.data.Position
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.classification.LogisticRegressionWithSGD
+import org.apache.spark.SparkConf
 
 /**
  * 逻辑回归模型
@@ -37,7 +38,7 @@ object LRModel extends Serializable
     testCookies.map(cookieid => (cookieid, unionRecords.filter(record => record.substring(0, record.indexOf("\t")) == cookieid)))
                .map {
                       case (cookieid, records) => 
-                        val datas = records.map(_.split("\t")).sortBy(_(4).toLong).map(labeledPoint)
+                        val datas = records.map(_.split("\t")).map(labeledPoint).cache() // .sortBy(_(4).toLong)
                         LogisticRegressionWithSGD.train(datas, 10, .05)
                                                  .save(sc, "/home/team016/middata/model/lr/" + cookieid)
                     }
@@ -46,7 +47,7 @@ object LRModel extends Serializable
 //                 .groupBy(record => record.substring(0, record.indexOf("\t")))
 //                 .map { case (cookieid, records) => 
 //                          val sc2 = new SparkContext(bconfig.value)
-//                          val datas = sc2.parallelize(records.toSeq).map(_.split("\t").sortBy(_(4).toLong)).map(labeledPoint)
+//                          val datas = sc2.parallelize(records.toSeq).map(_.split("\t")).map(labeledPoint) //.sortBy(_(4).toLong)
 //                          datas.cache()
 //                          LogisticRegressionWithSGD.train(datas, 20, .05)
 //                                                   .save(sc2, "/home/team016/middata/model/lr/" + cookieid)
@@ -54,24 +55,33 @@ object LRModel extends Serializable
 //                 .count
   }
   
+  def trainLocal = 
+  {
+    val sc = new SparkContext(new SparkConf())
+    "m1NfUhbQujboiZKAEM0zNY7OUYVKuk, m1NfUh3QuhR2NWNduDqWi7uWmdFKuk, m1NfUhbQubPhUbG5yWKpPYFn07FKuk, yb0Qwj7_uRRC2YIREycfRM-jm17ZIk, HZGNrH7_u-FHn7I2rytdEhQsnNOaIk, w-RDugRAubGPNLFWmYNoNgPJnAqvNE, uvVYENdyubQVuRw8pHwuEN65PLKOIk, njRWwDuARMmo0A6amNqCuDwiibRKuk, RDqMHZ6Ay-ufNRwoi1wFpZKFU7uhuk, m1NfUMnQu-PrmvqJP-PEiY7LIHPKuk, pvG8ihRAmWFiP17JpRcdwg7Y0LDYNE, m1NfUh3QuhcYwNuzyAt30duwXMPKuk, UvqNu7K_uyIgyWR60gDvw7GjPA6GNE, NDwwyBqyugRvuDOOE1EosdR3ERRdNE, m1NfUh3QuA_oIR73N-E30DPlRh6Kuk, RNu7u-GAm1Nd0vF3rNI7RWK8IZK_EE, m1NfUMK_mv_OEy7VnL0OpYndPd6Kuk, m1NfUh3Qu-PgnMw701FpmREvIZ6Kuk, uA-ZPD-AuHP2rAF_Pv-oIY_1w1FNNE"
+    .split(", ")
+    .map(_.trim)
+    .map { cookieid => sc.textFile("data/userdata/test/") }
+    
+    val cookieid = "HZGNrH7_u-FHn7I2rytdEhQsnNOaIk"
+
+    val rawdatas = sc.textFile("data/userdata/train/" + cookieid).map(_.split("\t")).map(labelFetures).cache()
+    val firstCate3 = rawdatas.filter { case (label, features) => label == 1 && features(2) != -1 }.first._2(2)
+    
+    val bcate3 = sc.broadcast(firstCate3)
+    
+    val datas = rawdatas.map { case (label, features) => 
+                    if (features(2) == -1) features(2) = bcate3.value
+//                    preCate3 = features(2)
+                    LabeledPoint(label, Vectors.dense(features)) }
+    
+    val model = LogisticRegressionWithSGD.train(datas, 10, .05)
+    model.weights
+  }
+  
   def labeledPoint(values: Array[String]) =
   {
-    val p = Position(infoid = values(2),
-										 scate1 = values(6),
-										 scate2 = values(7),
-										 scate3 = values(8),
-										 title = values(9),
-										 userid = values(5),
-										 local = values(10),
-										 salary = values(11),
-										 education = values(12),
-										 experience = values(13),
-										 trade = values(14),
-										 enttype = values(15),
-										 fresh = values(17),
-										 fuli = values(16),
-										 additional = values(18)
-										 )
+    val p = position(values)
     val features = Vectors.dense(p.lrFeatures)
     
     // 查看电话seetel、在线交谈message、立即申请apply 点击记为1，展现记为0
@@ -85,6 +95,44 @@ object LRModel extends Serializable
     }
     
     LabeledPoint(label, features)
+  }
+  
+  def labelFetures(values: Array[String]) =
+  {
+    val p = position(values)
+    val features = p.lrFeatures
+    
+    // 查看电话seetel、在线交谈message、立即申请apply 点击记为1，展现记为0
+    val label = values(3) match {
+      case "seetel" => 1.0
+      case "message" => 1.0
+      case "apply" => 1.0
+      case "1" => 1.0
+      case "0" => 0.0
+      case _ => 0.0
+    }
+    
+    (label, features)
+  }
+  
+  def position(values: Array[String]) = 
+  {
+    Position(infoid = values(2),
+						 scate1 = values(6),
+						 scate2 = values(7),
+						 scate3 = values(8),
+						 title = values(9),
+						 userid = values(5),
+						 local = values(10),
+						 salary = values(11),
+						 education = values(12),
+						 experience = values(13),
+						 trade = values(14),
+						 enttype = values(15),
+						 fresh = values(17),
+						 fuli = values(16),
+						 additional = values(18)
+						 )
   }
   
   def main(args: Array[String]): Unit = 

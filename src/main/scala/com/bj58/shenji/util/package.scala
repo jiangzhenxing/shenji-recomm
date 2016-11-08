@@ -10,4 +10,5 @@ package object util
     math.sqrt(v.map(d ⇒ d * d).sum)
   }
 
+  def vecdot(v1: Array[Double], v2: Array[Double]): Double = v1.zip(v2).map { case (d1,d2) => d1 * d2 }.sum
 }
