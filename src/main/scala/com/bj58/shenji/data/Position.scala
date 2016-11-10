@@ -43,11 +43,7 @@ case class Position( infoid: String,		// 职位ID
    */
   def lrFeatures: Array[Double] = 
   {
-    // 薪资是否不限，薪资, 学历要求, 工作年限，是否接受应届生，五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作，企业性质one-hot编码
-//    (if (salary == 1) Array(1.0, 0d) else Array(0d, salary)) ++:
-//    (if (education == 1) Array(1.0, 0d) else Array(0d, education)) ++:
-//    (if (experience == 1) Array(1.0, 0d) else Array(0d, experience)) ++:
-    // scate1.toLong/1000,scate2.toLong/1000,(if (scate3 == "-") -1 else scate3.toLong)/10000,
+    // 是否接受应届生，薪资one-hot, 学历要求one-hot, 工作年限one-hot，五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作，企业性质one-hot编码
     Array[Double](fresh) ++: salaryOneHot ++: educationOneHot ++: experienceOneHot ++: fuliFeature ++: additionalFeature ++: enttypeOneHot
   }
   
@@ -55,10 +51,10 @@ case class Position( infoid: String,		// 职位ID
    * 产生用于决策树回归模型的特征
    * 公司性质为类别型特征，不需one-hot编码
    */
-  def dtFeatures: Array[Double] =
+  def dtrFeatures: Array[Double] =
   {
-    // 薪资, 学历要求, 工作年限，是否接受应届生,企业性质,五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作，
-    Array[Double](salary,education,experience,fresh,enttype.toInt) ++: fuliFeature ++: additionalFeature
+    // 是否接受应届生,薪资, 学历要求, 工作年限，企业性质,五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作，
+    Array[Double](fresh) ++: salaryOneHot ++: educationOneHot ++: experienceOneHot ++: fuliFeature ++: additionalFeature ++: enttypeOneHot
   }
   
   def salaryOneHot = Range(1, 11).map(s => if (salary == s) 1d else 0d)

@@ -35,12 +35,19 @@ object Test1 {
     
 //    "aaa,bbb,ccc,ddd".split(",", 2).foreach { println }
     
-    Range(1,16).foreach(dt => println(dt))
+//    Range(1,16).foreach(dt => println(dt))
+//    
+//    val a = Array(1,2,3,4)
+//    a(0) = 0
+//    println(a.mkString(","))
+//    
+//    Range(10,30,1).foreach(x => println(x/10d))
     
-    val a = Array(1,2,3,4)
-    a(0) = 0
-    println(a.mkString(","))
+    println(math.exp(1))
     
-    Range(10,30,1).foreach(x => println(x/10d))
+    val m = Map("0" -> 10000, "1" -> 3000)
+    println(m.getOrElse("see", 0).doubleValue())
+    
+    println(math.ceil(1.123456))
   }
 }
