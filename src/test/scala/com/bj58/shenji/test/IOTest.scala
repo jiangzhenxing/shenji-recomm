@@ -1,6 +1,7 @@
 package com.bj58.shenji.test
 
 import java.io._
+import scala.io.Source
 
 object IOTest extends App {
   splitData
@@ -18,6 +19,7 @@ object IOTest extends App {
                 val train = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("data/userdata/train/" + cookieid)))
                 val valid = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("data/userdata/valid/" + cookieid)))
                 val test = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("data/userdata/test/" + cookieid)))
+                
                 val num_train = (count * .8).intValue
                 val num_valid = (count * .1).intValue
                 val num_test = count - num_train - num_valid

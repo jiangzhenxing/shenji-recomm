@@ -6,6 +6,7 @@ import org.apache.spark.broadcast.Broadcast
 
 import com.bj58.shenji.data._
 import com.bj58.shenji.wanted.LRModel
+import com.bj58.shenji.wanted.DTModel
 
 /**
  * 模型训练
@@ -20,6 +21,8 @@ object Train
     if (args(0) == "LR")
       LRModel.train(sc)
       
+    if (args(0) == "DT")
+      DTModel.train(sc)
 //    if (args(0) == "dt")
 //      Range(1,16).foreach(dt => extractAction(sc, bcookies, dt))
     sc.stop()

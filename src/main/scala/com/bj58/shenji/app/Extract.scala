@@ -43,7 +43,7 @@ object Extract
   }
   
   /**
-   * 提取点击事件关联职位信息
+   * 提取测试集中的用户的点击事件关联职位信息
    */
   def extractAction(sc: SparkContext, dt: Int) = 
   {
@@ -83,6 +83,30 @@ object Extract
             .map { case (infoid, (cookieid,position)) => (cookieid, Position(position)) }
             .map { case (cookieid, p) =>  Array(cookieid,p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep) }
             .saveAsTextFile("/home/team016/middata/test_user_position/")
+  }
+  
+  /**
+   * 抽取测试数据中的简历信息
+   */
+  def extractTestResume(sc: SparkContext) =
+  {
+    val sep = "\t"
+    // 找到用户id
+    val listUser = (sc.textFile("/home/team016/middata/test_list_position/*")
+                     .map(_.split("\t",5))
+                     .map(values => (values(1),values(0))) // userid, cookieid
+                     .distinct())
+                     
+    val resume = (sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/resume/*")
+                      .map(p => (p.substring(0, p.indexOf("\001")), p))) // userid, resume
+    listUser.join(resume)
+            .mapValues { case (cookieid, resume) => cookieid + sep + resume }
+            .map(_._1)
+            .saveAsTextFile("/home/team016/middata/test_user_resume")
+//    testdata.join(resume)
+//            .map { case (infoid, (cookieid,position)) => (cookieid, Position(position)) }
+//            .map { case (cookieid, p) =>  Array(cookieid,p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep) }
+//            .saveAsTextFile("/home/team016/middata/test_user_position/")
   }
   
   /**
@@ -195,11 +219,24 @@ object Extract
                       writer.close() }
   }
   
+  def testTrainData(sc: SparkContext) =
+  {
+    val sep = "\t"
+    // (0,19 155 442) (1,637829)
+    val list_position = sc.textFile("/home/team016/middata/test_list_position/*")
+    // 87895
+    val action_position = sc.textFile("/home/team016/middata/test_action_position/*")
+    
+    // (cookieid,0),(userid,1),(infoid,2),(clicktag,3),(clicktime,4),(userid,5),(scate1,6),(scate2,7),(scate3,8),(title,9),(local,10),
+    // (salary,11),(education,12),(experience,13),(trade,14),(enttype,15),(fuli,16),(fresh,17),(additional,18)
+    list_position.union(action_position)
+                 .sortBy(record => { val values = record.split(sep); values(0) + sep + values(4) }, true, 5)
+                 .saveAsTextFile("/home/team016/middata/test_train_data/")
+  }
+  
   def testCookieSet(sc: SparkContext) = 
   {
-    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
-    val testCookies = testdata.map(_.split("\001")(0)).distinct.collect.toSet
-    testCookies
+    sc.textFile("/home/team016/middata/test_cookies").collect.toSet
   }
   
   def sparkContext = new SparkContext(new SparkConf())
@@ -218,6 +255,10 @@ object Extract
     if (args(0) == "position")
       extractTestPosition(sc)
       
+    if (args(0) == "resume") {
+      extractTestResume(sc)
+    }
+      
     if (args(0) == "actionByUser")
       extratActionByUser(sc)
       
@@ -227,6 +268,10 @@ object Extract
     
     if (args(0) == "copy") {
       copyToLocal(sc)
+    }
+    
+    if (args(0) == "TrainData") {
+      testTrainData(sc)
     }
     
     sc.stop()
