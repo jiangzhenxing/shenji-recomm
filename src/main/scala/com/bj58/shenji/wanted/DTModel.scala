@@ -11,14 +11,18 @@ import org.apache.spark.mllib.tree.DecisionTree
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Callable
 
 import com.bj58.shenji.data.Position
+import org.slf4j.LoggerFactory
 
 /**
  * 决策权回归模型
  */
 object DTModel extends Serializable 
 {
+  val logger = LoggerFactory.getLogger("DTModel")
+  
   def train(sc: SparkContext) = 
   {
     val sep = "\t"
@@ -26,8 +30,6 @@ object DTModel extends Serializable
 //    val list_position = sc.textFile("/home/team016/middata/test_list_position/*")
     // 87895
 //    val action_position = sc.textFile("/home/team016/middata/test_action_position/*")
-    
-    val train_data = sc.textFile("/home/team016/middata/test_train_data/")
     
     val testCookies = sc.textFile("/home/team016/middata/test_cookies").collect
     
@@ -37,19 +39,44 @@ object DTModel extends Serializable
     
     val executor = Executors.newFixedThreadPool(32)
     
-    val result = testCookies.map(cookieid => (cookieid, train_data.filter(record => record.substring(0, record.indexOf("\t")) == cookieid)))
-                            .map { case (cookieid, records) => 
-                                      executor.submit(new Runnable() {
-                                        def run = {
-                                          val rawdatas = records.map(_.split("\t")).map(values => (values(3), position(values)))
-                                          val actionCount = rawdatas.map { case (action, position) => (action,1) }.reduceByKey(_ + _).collectAsMap
-                                          val bactionCount = sc.broadcast(actionCount)
-                                          val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, bactionCount.value) }.cache // .sortBy(_(4).toLong)
-                                          DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity="variance", maxDepth=9, maxBins=32)
-                                                      .save(sc, "/home/team016/middata/model/dt/" + cookieid) // 9:0.6448457311761356
-                                        }
-                                      }) }
-                             .foreach(_.get)
+    testCookies.map { cookieid =>
+                        executor.submit(new Callable[String]() {
+                          def call = {
+                            try {
+                              val rawdatas = sc.textFile("/home/team016/middata/traindatabyuser/" + cookieid + "-*")
+                                               .map(_.split("\t")).map(values => (values(3), position(values)))
+                              val actionCount = rawdatas.map { case (action, position) => (action,1) }.reduceByKey(_ + _).collectAsMap
+                              val bactionCount = sc.broadcast(actionCount)
+                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, bactionCount.value) }.cache // .sortBy(_(4).toLong)
+                              DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity="variance", maxDepth=9, maxBins=32)
+                                                        .save(sc, "/home/team016/middata/model/dt/" + cookieid) // 9:0.6448457311761356
+                              cookieid
+                            } catch {
+                               case t: Throwable => throw new RuntimeException(cookieid)
+                            }
+                          }
+                    })
+                  }
+            .foreach(f => try { logger.info(f.get + " has complete in dtmodel") } catch { case e: Exception => logger.error(e.getMessage + " in dtmodel", e) } )
+    
+//    val result = testCookies.map(cookieid => (cookieid, train_data.filter(record => record.substring(0, record.indexOf("\t")) == cookieid)))
+//                            .map { case (cookieid, records) => 
+//                                      executor.submit(new Callable[String]() {
+//                                        def call = {
+//                                          try {
+//                                            val rawdatas = records.map(_.split("\t")).map(values => (values(3), position(values)))
+//                                            val actionCount = rawdatas.map { case (action, position) => (action,1) }.reduceByKey(_ + _).collectAsMap
+//                                            val bactionCount = sc.broadcast(actionCount)
+//                                            val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, bactionCount.value) }.cache // .sortBy(_(4).toLong)
+//                                            DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity="variance", maxDepth=9, maxBins=32)
+//                                                        .save(sc, "/home/team016/middata/model/dt/" + cookieid) // 9:0.6448457311761356
+//                                            cookieid
+//                                          } catch {
+//                                            case t: Throwable => throw new RuntimeException(cookieid)
+//                                          }
+//                                        }
+//                                      }) }
+//                             .foreach(f => try { logger.info(f.get + " has complete") } catch { case e: Exception => logger.error(e.getMessage, e) } )
       executor.shutdown()
   }
   

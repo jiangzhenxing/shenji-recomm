@@ -3,6 +3,7 @@ package com.bj58.shenji.app
 import org.apache.spark.SparkConf
 import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.HashPartitioner
 
 import scala.collection.mutable.Map
 import scala.collection.Set
@@ -10,6 +11,8 @@ import scala.collection.Set
 import java.io._
 
 import com.bj58.shenji.data._
+import com.bj58.shenji.util._
+import org.apache.hadoop.io.NullWritable
 
 /**
  * 数据抽取
@@ -74,14 +77,15 @@ object Extract
     
     val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
                      .map(_.split("\001"))
-                     .map(values => (values(1), values(0)))
+                     .map(values => (values(1), values(0))) // infoid, cookieid
                      
     val positions = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=16")
-                      .map(p => (p.substring(0, p.indexOf("\001")), p))
+                      .map(p => (p.substring(0, p.indexOf("\001")), p))  // infoid, position
                       
     testdata.join(positions)
             .map { case (infoid, (cookieid,position)) => (cookieid, Position(position)) }
-            .map { case (cookieid, p) =>  Array(cookieid,p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep) }
+            .map { case (cookieid, p) =>  Array(cookieid,p.infoid,p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep) }
+            .repartition(10)
             .saveAsTextFile("/home/team016/middata/test_user_position/")
   }
   
@@ -144,32 +148,6 @@ object Extract
     // (cookieid,0),(userid,1),(infoid,2),(clicktag,3),(clicktime,4),(userid,5),(scate1,6),(scate2,7),(scate3,8),(title,9),(local,10),
     // (salary,11),(education,12),(experience,13),(trade,14),(enttype,15),(fuli,16),(fresh,17),(additional,18)
     list_position.union(action_position)
-  }
-  
-  /**
-   * 从测试数据按用户分开保存
-   */
-  def extratActionByUser(sc: SparkContext) =
-  {
-    val sep = "\t"
-    val testCookies = testCookieSet(sc)
-    
-    // (0,19 155 442) (1,637829)
-    val list_position = sc.textFile("/home/team016/middata/test_list_position/*")
-    // 87895
-    val action_position = sc.textFile("/home/team016/middata/test_action_position/*")
-    
-//    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
-//    val testCookies = testdata.map(_.split("\001")(0)).distinct.collect
-    
-    // (cookieid,0),(userid,1),(infoid,2),(clicktag,3),(clicktime,4),(userid,5),(scate1,6),(scate2,7),(scate3,8),(title,9),(local,10),
-    // (salary,11),(education,12),(experience,13),(trade,14),(enttype,15),(fuli,16),(fresh,17),(additional,18)
-    val unionRecords = list_position.union(action_position)
-    
-    testCookies.map(cookieid => (cookieid,unionRecords.filter(record => record.substring(0, record.indexOf("\t")) == cookieid)))
-               .map {case (cookieid, records) => records.cache()
-                                                        .sortBy(_.split("\t",7)(4).toLong)
-                                                        .saveAsTextFile("/home/team016/middata/test_all_action_by_user/" + cookieid) }
   }
   
   /**
@@ -259,9 +237,6 @@ object Extract
       extractTestResume(sc)
     }
       
-    if (args(0) == "actionByUser")
-      extratActionByUser(sc)
-      
     if (args(0) == "partUser") {
       extratPartUser(sc)
     }
@@ -273,6 +248,8 @@ object Extract
     if (args(0) == "TrainData") {
       testTrainData(sc)
     }
+    
+    
     
     sc.stop()
   }
