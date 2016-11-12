@@ -43,18 +43,50 @@ case class Position( infoid: String,		// 职位ID
    */
   def lrFeatures: Array[Double] = 
   {
-    // 是否接受应届生，薪资one-hot, 学历要求one-hot, 工作年限one-hot，五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作，企业性质one-hot编码
-    Array[Double](fresh) ++: salaryOneHot ++: educationOneHot ++: experienceOneHot ++: fuliFeature ++: additionalFeature ++: enttypeOneHot
+    // 是否接受应届生，薪资one-hot, 学历要求one-hot, 工作年限one-hot，五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作，企业性质one-hot编码, 职位行业one-hot编码
+    Array[Double](fresh) ++: salaryOneHot ++: educationOneHot ++: experienceOneHot ++: fuliFeature ++: additionalFeature ++: enttypeOneHot ++: traidOneHot
   }
   
   /**
    * 产生用于决策树回归模型的特征
    * 公司性质为类别型特征，不需one-hot编码
-   */
+   
   def dtrFeatures: Array[Double] =
   {
     // 是否接受应届生,薪资, 学历要求, 工作年限，企业性质,五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作，
     Array[Double](fresh) ++: salaryOneHot ++: educationOneHot ++: experienceOneHot ++: fuliFeature ++: additionalFeature ++: enttypeOneHot
+  }
+  */
+  /**
+   * 产生用于决策树回归模型的特征
+   */
+  def dtFeatures: Array[Double] = 
+  {
+    // 是否接受应届生2，薪资10, 学历要求8, 工作年限7，企业性质11，五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作
+    Array[Double](fresh, salary-1, education-1, experienceCate, enttypeCate) ++: fuliFeature ++: additionalFeature
+  }
+  
+  /**
+   * 公司性质重新编码为11个类别：0-10
+   * 1476:私营 1477:国有 1478:股份制 1479:外商独资/办事处 1480:中外合资/合作 1481:上市公司 1482:事业单位 1483:政府机关 1484:非营利机构 1485:个人企业 -:末知
+   */
+  def enttypeCate = if (enttype != "-") enttype.toInt - 1476 else 10
+  
+  /**
+   * 工作年限重新编码为7个类别：0-6
+   * 1:不限 4:1年以下 5:1-2年 6:3-5年 7:6-7年 8:8-10年 9:10年以上
+   */
+  def experienceCate =
+  {
+    experience match {
+      case 1 => 0
+      case 4 => 1
+      case 5 => 2
+      case 6 => 3
+      case 7 => 4
+      case 8 => 5
+      case 9 => 6
+    }
   }
   
   def salaryOneHot = Range(1, 11).map(s => if (salary == s) 1d else 0d)
@@ -62,6 +94,8 @@ case class Position( infoid: String,		// 职位ID
   def educationOneHot = Range(1, 9).map(e => if (e == education) 1d else 0d)
   
   def experienceOneHot = Array(1, 4, 5, 6, 7, 8, 9).map(e => if (e == experience) 1d else 0d)
+  
+  def traidOneHot = Array("244","245","246","247","248","249","250","251","252","253","254","255","256","257","258","259","260","261","262","263","264","265","266","267","268","269","270","271","272","273","274","275","276","277","278","279","280","281","282","283","284","285","286","3527","287","288","289","290","291","294","295","296").map(t => if (t == trade) 1d else 0d)
   
   /**
    * 将公司性质进行one-Hot编码
@@ -154,5 +188,11 @@ object Position
 						 fresh = values(20),
 						 fuli = values(19),
 						 additional = values(22))
+  }
+  
+  def dtCates: Map[Int,Int] = Map[Int,Int]((1,10), (2,8), (3,7), (4,11))
+  
+  def main(args: Array[String]): Unit = {
+    println(dtCates)
   }
 }

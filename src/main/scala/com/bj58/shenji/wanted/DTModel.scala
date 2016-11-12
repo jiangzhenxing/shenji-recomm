@@ -26,7 +26,7 @@ object DTModel extends Serializable
   def train(sc: SparkContext) = 
   {
     val sep = "\t"
-    // (0,19 155 442) (1,637829)
+    // (0, 19 155 442) (1, 637 829)
 //    val list_position = sc.textFile("/home/team016/middata/test_list_position/*")
     // 87895
 //    val action_position = sc.textFile("/home/team016/middata/test_action_position/*")
@@ -48,7 +48,7 @@ object DTModel extends Serializable
                               val actionCount = rawdatas.map { case (action, position) => (action,1) }.reduceByKey(_ + _).collectAsMap
                               val bactionCount = sc.broadcast(actionCount)
                               val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, bactionCount.value) }.cache // .sortBy(_(4).toLong)
-                              DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity="variance", maxDepth=9, maxBins=32)
+                              DecisionTree.trainRegressor(datas, Position.dtCates, impurity="variance", maxDepth=10, maxBins=36)
                                                         .save(sc, "/home/team016/middata/model/dt/" + cookieid) // 9:0.6448457311761356
                               cookieid
                             } catch {
@@ -102,7 +102,7 @@ object DTModel extends Serializable
   
   def labeledPoints(action: String, position: Position, actionCount: scala.collection.Map[String, Int]) =
   {
-    val features = Vectors.dense(position.lrFeatures)
+    val features = Vectors.dense(position.dtFeatures)
     
     val seetelCount = actionCount.getOrElse("seetel", 0).doubleValue
     val messageCount = actionCount.getOrElse("message", 0).doubleValue

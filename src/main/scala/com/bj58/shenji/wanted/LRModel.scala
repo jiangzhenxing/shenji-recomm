@@ -7,7 +7,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.classification.LogisticRegressionWithSGD
-import org.apache.spark.SparkConf
+import org.apache.spark.mllib.tree.DecisionTree
 
 import com.bj58.shenji.data.Position
 import org.apache.spark.SparkConf
@@ -42,7 +42,7 @@ object LRModel extends Serializable
     // (salary,11),(education,12),(experience,13),(trade,14),(enttype,15),(fuli,16),(fresh,17),(additional,18)
 //    val unionRecords = list_position.union(action_position).sortBy(record => { val values = record.split(sep); values(0) + sep + values(4) }, true, 15)
     
-    val executor = Executors.newFixedThreadPool(32)
+    val executor = Executors.newFixedThreadPool(16)
     
     testCookies.map { cookieid =>
                         executor.submit(new Callable[String]() {
@@ -53,10 +53,13 @@ object LRModel extends Serializable
                               val actionCount = rawdatas.map { case (action, position) => (action,1) }.reduceByKey(_ + _).collectAsMap
                               val bactionCount = sc.broadcast(actionCount)
                               val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, bactionCount.value) }.cache // .sortBy(_(4).toLong)
-                              LogisticRegressionWithSGD.train(datas, 250, 2).save(sc, "/home/team016/middata/model/lr/" +cookieid)
+                              LogisticRegressionWithSGD.train(datas, 250, 2)
+                                                       .save(sc, "/home/team016/middata/model/lr/" +cookieid)
+                              DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity="variance", maxDepth=10, maxBins=36)
+                                          .save(sc, "/home/team016/middata/model/dt/" + cookieid) // 9:0.6448457311761356
                               cookieid
                             } catch {
-                               case t: Throwable => throw new RuntimeException(cookieid)
+                               case t: Throwable => throw new RuntimeException(cookieid, t)
                             }
                           }
                     })
