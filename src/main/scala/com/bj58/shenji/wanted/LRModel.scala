@@ -16,6 +16,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.CountDownLatch
 import org.slf4j.LoggerFactory
 import java.util.concurrent.Callable
+import java.util.concurrent.TimeUnit
 
 /**
  * 逻辑回归模型
@@ -27,24 +28,49 @@ object LRModel extends Serializable
    */
   val logger = LoggerFactory.getLogger("LRModel")
   
-  def train(sc: SparkContext) = 
+  def train = 
   {
     val sep = "\t"
+    val conf = new SparkConf().setAppName("Train")
+    val sc = new SparkContext(conf)
     // (0,19 155 442) (1,637829)
 //    val list_position = sc.textFile("/home/team016/middata/test_list_position/*")
 //    // 87895
 //    val action_position = sc.textFile("/home/team016/middata/test_action_position/*")
     
-    val train_data = sc.textFile("/home/team016/middata/test_train_data/")
+//    val train_data = sc.textFile("/home/team016/middata/test_train_data/")
     val testCookies = sc.textFile("/home/team016/middata/test_cookies").collect
+    
     
     // (cookieid,0),(userid,1),(infoid,2),(clicktag,3),(clicktime,4),(userid,5),(scate1,6),(scate2,7),(scate3,8),(title,9),(local,10),
     // (salary,11),(education,12),(experience,13),(trade,14),(enttype,15),(fuli,16),(fresh,17),(additional,18)
 //    val unionRecords = list_position.union(action_position).sortBy(record => { val values = record.split(sep); values(0) + sep + values(4) }, true, 15)
     
-    val executor = Executors.newFixedThreadPool(16)
+    val executor = Executors.newFixedThreadPool(4)
+    
+    val accum = sc.accumulator(0, "SUCESS_COUNT")
     
     testCookies.map { cookieid =>
+      println(cookieid)
+//      try {
+//                              val train_data = sc.textFile("/home/team016/middata/traindatabyuser/" + cookieid + "-*")
+//                              val rawdatas = train_data.map(_.split("\t")).map(values => (values(3), position(values)))
+//                              val actionCount = rawdatas.map { case (action, position) => (action,1) }.reduceByKey(_ + _).collectAsMap
+//                              val bactionCount = sc.broadcast(actionCount)
+//                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, bactionCount.value) }.cache // .sortBy(_(4).toLong)
+//                              try {
+//                                LogisticRegressionWithSGD.train(datas, 250, 2)
+//                                                         .save(sc, "/home/team016/middata/model/lr2/" +cookieid)
+//                                DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity="variance", maxDepth=10, maxBins=36)
+//                                            .save(sc, "/home/team016/middata/model/dt2/" + cookieid) // 9:0.6448457311761356
+//                                accum += 1
+//                              } finally {
+//                                datas.unpersist(true)
+//                                bactionCount.destroy()
+//                              }
+//                      } catch {
+//                               case t: Throwable => logger.error(cookieid, t)
+//                     }
                         executor.submit(new Callable[String]() {
                           def call = {
                             try {
@@ -53,10 +79,16 @@ object LRModel extends Serializable
                               val actionCount = rawdatas.map { case (action, position) => (action,1) }.reduceByKey(_ + _).collectAsMap
                               val bactionCount = sc.broadcast(actionCount)
                               val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, bactionCount.value) }.cache // .sortBy(_(4).toLong)
-                              LogisticRegressionWithSGD.train(datas, 250, 2)
-                                                       .save(sc, "/home/team016/middata/model/lr/" +cookieid)
-                              DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity="variance", maxDepth=10, maxBins=36)
-                                          .save(sc, "/home/team016/middata/model/dt/" + cookieid) // 9:0.6448457311761356
+                              try {
+                                LogisticRegressionWithSGD.train(datas, 250, 2)
+                                                         .save(sc, "/home/team016/middata/model/lr3/" +cookieid)
+                                DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity="variance", maxDepth=10, maxBins=36)
+                                          .save(sc, "/home/team016/middata/model/dt3/" + cookieid) // 9:0.6448457311761356
+                                accum += 1
+                                } finally {
+                                datas.unpersist(true)
+                                bactionCount.destroy()
+                              }
                               cookieid
                             } catch {
                                case t: Throwable => throw new RuntimeException(cookieid, t)
@@ -84,7 +116,8 @@ object LRModel extends Serializable
 //                                        }
 //                                      }) }
 //                              .foreach(f => try { logger.info(f.get + " has complete") } catch { case e: Exception => logger.error(e.getMessage, e) } )
-    executor.shutdown()
+    executor.awaitTermination(10, TimeUnit.DAYS)
+    sc.stop()
 //    sc.parallelize(result).map(_.get()).saveAsTextFile("/home/team016/middata/model/lr/")
     
 //    list_position.union(action_position)

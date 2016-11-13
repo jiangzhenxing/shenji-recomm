@@ -15,16 +15,16 @@ object Train
 {
   def main(args: Array[String]): Unit = 
   {
-    val conf = new SparkConf().setAppName("Train " + args(0))
-    val sc = new SparkContext(conf)
+//    val conf = new SparkConf().setAppName("Train " + args(0))
+//    val sc = new SparkContext(conf)
     
     if (args(0) == "LR")
-      LRModel.train(sc)
+      LRModel.train
       
-    if (args(0) == "DT")
-      DTModel.train(sc)
+//    if (args(0) == "DT")
+//      DTModel.train(sc)
 //    if (args(0) == "dt")
 //      Range(1,16).foreach(dt => extractAction(sc, bcookies, dt))
-    sc.stop()
+//    sc.stop()
   }
 }

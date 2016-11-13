@@ -9,6 +9,8 @@ import org.apache.spark.mllib.tree.DecisionTree
 import org.apache.spark.mllib.classification.LogisticRegressionModel
 import org.apache.spark.mllib.tree.model.DecisionTreeModel
 
+import java.io._
+
 import com.bj58.shenji.data._
 import com.bj58.shenji.util._
 import org.apache.spark.mllib.linalg.Vectors
@@ -25,8 +27,19 @@ object Evaluate
     val sep = "\t"
     val values = record.split(sep)
     val cookieid = values(0)
-    val p = position(values)
-    (values(0), values(1), lrEvaluate(sc, cookieid, p) + dtEvaluate(sc, cookieid, p) * 0.4)
+    
+    var scorelr = 0.5
+    var scoredt = 0.5
+    var score = 0.5
+    
+    if (values.length > 15) {
+      val p = position(values)
+      scorelr = lrEvaluate(sc, cookieid, p)
+      scoredt = dtEvaluate(sc, cookieid, p)
+      score = scorelr + scoredt * 0.4
+    }
+    
+    (values(0), values(1), scorelr, scoredt, score)
   }
   
   
@@ -46,6 +59,21 @@ object Evaluate
       preCookie = cookieid
     }
     dtModel.predict(Vectors.dense(p.lrFeatures))
+  }
+  
+  def clickEvaluate(sc: SparkContext) =
+  {
+    val testData = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
+                     .map(_.split("\001"))
+                     .map(values => (values(1), values(0))) // infoid, cookieid
+                     
+    val avgClick = sc.textFile("/home/team016/middata/avg_position_click/")  // infoid, avg_click
+                     .map(_.split("\001"))
+                     .map(values => (values(0), values(1)))
+    testData.leftOuterJoin(avgClick)
+            .map { case (infoid, (cookieid, score)) => Array(cookieid, infoid, if (score == None) "-" else score.get).mkString("\t") }
+            .repartition(1)
+            .saveAsTextFile("/home/team016/resultdata/result1") // 961957
   }
   
   /**
@@ -78,12 +106,15 @@ object Evaluate
     val sc = new SparkContext(conf)
     
     val sep = "\t"
-    
+    val out = new File("/home/team016/shenji/result/result_jiangzhenxing_20161113_v3.txt")
+    val writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(out)))
     val test_data = sc.textFile("/home/team016/middata/test_user_position/")
                       .sortBy(_.split(sep, 2)(0))
                       .toLocalIterator
                       .map(record => evaluate(sc, record))
-                      .map { case (cookieid,infoid,score) => cookieid + sep + infoid + sep + score }
+                      .map { case (cookieid,infoid,scorelr, scoredt, score) => cookieid + sep + infoid + sep + scorelr + sep + scoredt + sep + score }
+                      .foreach(r => writer.write(r + "\n"))
+    writer.close()
     sc.stop()
   }
 }

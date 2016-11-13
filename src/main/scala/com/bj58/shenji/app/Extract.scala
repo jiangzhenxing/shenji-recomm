@@ -182,6 +182,17 @@ object Extract
                                                         .saveAsTextFile("/home/team016/middata/test_all_action_by_user/" + cookieid) }
   }
   
+  def exactResult(sc: SparkContext) =
+  {
+    val out = new File("/home/team016/shenji/result/result_jiangzhenxing_20161113_v2.txt")
+    val writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(out)))
+    sc.textFile("/home/team016/resultdata/result1")
+      .map(_.split("\t"))
+      .map(values => { if (values(2) == "-") values(2) = "3"; values.mkString("\t") } )
+      .toLocalIterator
+      .foreach(r => writer.write(r + "\n"))
+    writer.close()
+  }
   
   def copyToLocal(sc: SparkContext) =
   {
