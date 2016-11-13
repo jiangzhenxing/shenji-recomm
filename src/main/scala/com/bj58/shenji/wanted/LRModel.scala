@@ -105,6 +105,12 @@ object LRModel extends Serializable
 //                 .saveAsTextFile("/home/team016/middata/model/LR")
   }
   
+  
+  def evalute() =
+  {
+    
+  }
+  
   def labeledPoints(action: String, position: Position, actionCount: scala.collection.Map[String, Int]) =
   {
     val features = Vectors.dense(position.lrFeatures)

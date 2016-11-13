@@ -77,16 +77,16 @@ object Extract
     
     val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
                      .map(_.split("\001"))
-                     .map(values => (values(1), values(0))) // infoid, cookieid
+                     .map(values => (values(1).trim, values(0))) // infoid, cookieid
                      
     val positions = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=16")
-                      .map(p => (p.substring(0, p.indexOf("\001")), p))  // infoid, position
+                      .map(p => (p.substring(0, p.indexOf("\001")).trim, p))  // infoid, position
                       
-    testdata.join(positions)
-            .map { case (infoid, (cookieid,position)) => (cookieid, Position(position)) }
-            .map { case (cookieid, p) =>  Array(cookieid,p.infoid,p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep) }
-            .repartition(10)
-            .saveAsTextFile("/home/team016/middata/test_user_position/")
+    testdata.leftOuterJoin(positions)
+            .map { case (infoid, (cookieid,position)) => (cookieid, if (position == None) None else Some(Position(position.get))) }
+            .map { case (cookieid, option) =>  if (option == None) cookieid + sep + "--" else { val p = option.get; Array(cookieid,p.infoid,p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep) } }
+            .repartition(1)
+            .saveAsTextFile("/home/team016/middata/test_user_position/") // 949258  961957 12699
   }
   
   /**
