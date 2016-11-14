@@ -21,6 +21,10 @@ object Train
     if (args(0) == "LR")
       LRModel.train
       
+      
+    if (args(0) == "LRPart")
+      LRModel.trainPart(args(1).toInt)
+      
 //    if (args(0) == "DT")
 //      DTModel.train(sc)
 //    if (args(0) == "dt")

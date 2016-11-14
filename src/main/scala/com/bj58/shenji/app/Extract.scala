@@ -223,6 +223,16 @@ object Extract
                  .saveAsTextFile("/home/team016/middata/test_train_data/")
   }
   
+  def splitUser
+  {
+    val sc = sparkContext
+    val testCookie = sc.textFile("/home/team016/middata/test_cookies").collect
+    val size = 6000
+    Range(0, testCookie.size, size).map(begin => testCookie.slice(begin, begin + size))
+                                   .zipWithIndex
+                                   .foreach { case (values, index) => sc.parallelize(values).saveAsTextFile("/home/team016/middata/test_cookies_split/part" + index) }
+  }
+  
   def testCookieSet(sc: SparkContext) = 
   {
     sc.textFile("/home/team016/middata/test_cookies").collect.toSet

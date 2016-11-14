@@ -22,7 +22,7 @@ object Evaluate
   var dtModel: DecisionTreeModel = null
   var preCookie: String = ""
   
-  def evaluate(sc: SparkContext, record: String) =
+  def evaluate(sc: SparkContext, record: String, click_score: scala.collection.Map[String, Double]) =
   {
     val sep = "\t"
     val values = record.split(sep)
@@ -30,7 +30,9 @@ object Evaluate
     
     var scorelr = 0.5
     var scoredt = 0.5
+    var scoreclick = click_score(cookieid + sep + values(1))
     var score = 0.5
+    
     
     if (values.length > 15) {
       val p = position(values)
@@ -39,7 +41,7 @@ object Evaluate
       score = scorelr + scoredt * 0.4
     }
     
-    (values(0), values(1), scorelr, scoredt, score)
+    (values(0), values(1), scorelr, scoredt, scoreclick, score)
   }
   
   
@@ -63,6 +65,7 @@ object Evaluate
   
   def clickEvaluate(sc: SparkContext) =
   {
+    val sep = "\t"
     val testData = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
                      .map(_.split("\001"))
                      .map(values => (values(1), values(0))) // infoid, cookieid
@@ -70,10 +73,23 @@ object Evaluate
     val avgClick = sc.textFile("/home/team016/middata/avg_position_click/")  // infoid, avg_click
                      .map(_.split("\001"))
                      .map(values => (values(0), values(1)))
+                     
     testData.leftOuterJoin(avgClick)
-            .map { case (infoid, (cookieid, score)) => Array(cookieid, infoid, if (score == None) "-" else score.get).mkString("\t") }
+//            .map { case (infoid, (cookieid, score)) => Array(cookieid, infoid, if (score == None) "-" else score.get).mkString("\t") }
+            .map { case (infoid, (cookieid, score)) => (cookieid, infoid, if (score == None) 0 else score.get.toDouble) }
+            .groupBy(_._1)
+            .flatMap { case (cookieid, iter) => { 
+              val values = iter.toArray
+              val clicks = values.map(_._3).filter(_ > 0)
+              
+              val avg_click = if (clicks.isEmpty) 0 else clicks.sum / clicks.size
+              var max_click = if (clicks.isEmpty) 1 else clicks.max
+              
+              values.map { case (cookieid,infoid,score) => cookieid + sep + infoid + sep + (if (score == 0) avg_click / max_click else score / max_click) }
+//              val values = .sortBy(_._3).reverse
+             }}
             .repartition(1)
-            .saveAsTextFile("/home/team016/resultdata/result1") // 961957
+            .saveAsTextFile("/home/team016/middata/click_evaluate") // 961957
   }
   
   /**
@@ -104,15 +120,21 @@ object Evaluate
   {
     val conf = new SparkConf().setAppName("Evaluate ")
     val sc = new SparkContext(conf)
-    
     val sep = "\t"
+    
+    val click_score = sc.textFile("/home/team016/middata/click_evaluate")
+                        .map(_.split(sep))
+                        .map { case Array(cookieid,infoid,score) => (cookieid + sep + infoid, score.toDouble) }
+                        .collectAsMap
+    
     val out = new File("/home/team016/shenji/result/result_jiangzhenxing_20161113_v3.txt")
     val writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(out)))
     val test_data = sc.textFile("/home/team016/middata/test_user_position/")
                       .sortBy(_.split(sep, 2)(0))
                       .toLocalIterator
-                      .map(record => evaluate(sc, record))
-                      .map { case (cookieid,infoid,scorelr, scoredt, score) => cookieid + sep + infoid + sep + scorelr + sep + scoredt + sep + score }
+                      .map(record => evaluate(sc, record, click_score))
+                      .map { case (cookieid,infoid,scorelr, scoredt, scoreclick, score) => 
+                                Array(cookieid,infoid,scorelr,scoredt,scoreclick,score).mkString(sep) }
                       .foreach(r => writer.write(r + "\n"))
     writer.close()
     sc.stop()
