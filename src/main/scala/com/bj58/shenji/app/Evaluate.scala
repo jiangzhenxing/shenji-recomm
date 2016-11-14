@@ -15,6 +15,9 @@ import com.bj58.shenji.data._
 import com.bj58.shenji.util._
 import org.apache.spark.mllib.linalg.Vectors
 
+/**
+ * 评分
+ */
 object Evaluate 
 {
   

@@ -62,6 +62,7 @@ public class TrainDataByUser extends Configured implements Tool
 		
 	}
 	
+	/*
 	static class MultipleTextOutputFormatWithoutKey extends MultipleTextOutputFormat<Text, Text> {
 		@Override
 		public String generateFileNameForKeyValue(Text key, Text value, String name) {
@@ -73,7 +74,7 @@ public class TrainDataByUser extends Configured implements Tool
 			return new Text();
 		}
 	}
-	
+	*/
 	@Override
 	public int run(String[] args) throws Exception
 	{

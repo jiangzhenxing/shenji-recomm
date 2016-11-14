@@ -13,6 +13,7 @@ import java.io._
 import com.bj58.shenji.data._
 import com.bj58.shenji.util._
 import org.apache.hadoop.io.NullWritable
+import org.apache.spark.Partitioner
 
 /**
  * 数据抽取
@@ -26,7 +27,7 @@ object Extract
   /**
    * 提取测试集中的用户的展示职位数据
    */
-  def extractDetail(sc: SparkContext, dt: Int) = 
+  def extractTestDetail(sc: SparkContext, dt: Int) = 
   {
     val testCookies = testCookieSet(sc)
     val bcookies = sc.broadcast(testCookies)
@@ -43,6 +44,33 @@ object Extract
     detail.join(position)
           .map { case (infoid: String, (d: String, p: String)) => d + sep + p }
           .saveAsTextFile("/home/team016/middata/test_list_position/dt" + dt)
+  }
+  
+  /**
+   * 提取用户的展示职位数据
+   */
+  def extractDetail(sc: SparkContext) = 
+  {
+    val sep = "\t"
+    val locals = sc.textFile("/home/team016/middata/area_city").map(_.split("\001")).map(values => (values(0),values(1))).collect.toMap
+    val blocals = sc.broadcast(locals)
+    
+    val detail = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/detail/*")
+                   .map(JobListRecord(_))
+                   .map(r => (r.infoid,Array(r.cookieid,r.userid,r.infoid,blocals.value.getOrElse(r.sloc1,-1),r.clicktag,if (r.clicktag == "1") r.clicktime else r.stime).mkString(sep)))
+                   
+    val position = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/*")
+                     .map(Position(_))
+                     .map(p => (p.infoid, Array(p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep)))
+    
+    detail.join(position)
+          .map { case (infoid: String, (d: String, p: String)) => {
+                    val detail = d.split(sep)
+                    val position = p.split(sep)
+                    (Array(detail(3),position(1), position(2)).mkString(sep), d + sep + p)
+                  }}
+          .repartitionAndSortWithinPartitions(new HashPartitioner(100))
+          .saveAsTextFile("/home/team016/middata/list_position/all")
   }
   
   /**
@@ -233,6 +261,31 @@ object Extract
                                    .foreach { case (values, index) => sc.parallelize(values).saveAsTextFile("/home/team016/middata/test_cookies_split/part" + index) }
   }
   
+  /**
+   * 测试数据中不同地区和职位
+   */
+  def testLocalJobCates = 
+  {
+    val sc = sparkContext
+    val test_data = sc.textFile("/home/team016/middata/test_train_data/")
+    val locals = sc.textFile("/home/team016/middata/area_city").map(_.split("\001")).map(values => (values(0),values(1))).collect.toMap
+//    val test_local = test_data.map(_.split("\t")).flatMap(values => values(10).split(",").map(locals.getOrElse(_,"-1"))).distinct.collect
+    test_data.map(_.split("\t"))
+             .flatMap(values => values(10).split(",").map(lc => Array(locals.getOrElse(lc,"-1"),values(6),values(7)).mkString("\t"))) // city,cate1,cate2,cate3
+             .distinct
+             .saveAsTextFile("/home/team016/middata/test_local_job2/")
+  }
+  
+  /**
+   * 详细数据按地域和职位类别排序保存
+   */
+  def detailByLocalJob
+  {
+    val sc = sparkContext
+    val detail = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/detail/*")
+//    detail.map(record => ()).partitionBy()
+  }
+  
   def testCookieSet(sc: SparkContext) = 
   {
     sc.textFile("/home/team016/middata/test_cookies").collect.toSet
@@ -245,8 +298,11 @@ object Extract
     val conf = new SparkConf().setAppName("Extract " + args(0))
     val sc = new SparkContext(conf)
     
-    if (args(0) == "detail")
-      Range(1,16).foreach(dt => extractDetail(sc, dt))
+    if (args(0).toLowerCase() == "testdetail")
+      Range(1,16).foreach(dt => extractTestDetail(sc, dt))
+      
+    if (args(0).toLowerCase() == "detail")
+      extractDetail(sc)
       
     if (args(0) == "action")
       Range(1,16).foreach(dt => extractAction(sc, dt))
