@@ -97,6 +97,29 @@ object Extract
   }
   
   /**
+   * 提取测试集中的用户的点击事件关联职位信息
+   */
+  def extractDelivery(sc: SparkContext, dt: Int) = 
+  {
+    val sep = "\t"
+    val testCookies = testCookieSet(sc)
+    val bcookies = sc.broadcast(testCookies)
+    
+    val delivery = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/delivery/dt=" + dt)
+                   .map(DeliveryRecord(_))
+                   .filter(r => bcookies.value.contains(r.cookieid))
+                   .map(r => (r.infoid, Array(r.cookieid, r.resumeuserid, r.infoid, "apply", r.deliverytime).mkString("\t")))
+                   
+    val position = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=" + dt)
+                     .map(Position(_))
+                     .map(p => (p.infoid, Array(p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep)))
+                     
+    delivery.join(position)
+          .map { case (infoid: String, (d: String, p: String)) => d + sep + p }
+          .saveAsTextFile("/home/team016/middata/test_delivery_position/dt" + dt)
+  }
+  
+  /**
    * 抽取测试数据中的职位信息
    */
   def extractTestPosition(sc: SparkContext) =
@@ -166,8 +189,7 @@ object Extract
   }
   
   
-  def test_all_actionSorted {
-    val sc = sparkContext
+  def test_all_actionSorted(sc: SparkContext) {
     // (0,19 155 442) (1,637829)
     val list_position = sc.textFile("/home/team016/middata/test_list_position/*")
     // 87895
@@ -251,9 +273,8 @@ object Extract
                  .saveAsTextFile("/home/team016/middata/test_train_data/")
   }
   
-  def splitUser
+  def splitUser(sc: SparkContext)
   {
-    val sc = sparkContext
     val testCookie = sc.textFile("/home/team016/middata/test_cookies").collect
     val size = 6000
     Range(0, testCookie.size, size).map(begin => testCookie.slice(begin, begin + size))
@@ -264,9 +285,8 @@ object Extract
   /**
    * 测试数据中不同地区和职位
    */
-  def testLocalJobCates = 
+  def testLocalJobCates(sc: SparkContext) = 
   {
-    val sc = sparkContext
     val test_data = sc.textFile("/home/team016/middata/test_train_data/")
     val locals = sc.textFile("/home/team016/middata/area_city").map(_.split("\001")).map(values => (values(0),values(1))).collect.toMap
 //    val test_local = test_data.map(_.split("\t")).flatMap(values => values(10).split(",").map(locals.getOrElse(_,"-1"))).distinct.collect
@@ -277,21 +297,93 @@ object Extract
   }
   
   /**
-   * 详细数据按地域和职位类别排序保存
+   * 为cookieid和infoid进行规范编码
    */
-  def detailByLocalJob
+  def idcode(sc: SparkContext)
   {
-    val sc = sparkContext
-    val detail = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/detail/*")
-//    detail.map(record => ()).partitionBy()
+    val click_count = sc.textFile("/home/team016/middata/click_count/")
+                        .map(_.split("\001"))
+
+    val cookieids = click_count.map(_(0)) // 9276870,9699254
+    val infoids = click_count.map(_(1))
+    
+    cookieids
+      .distinct
+      .zipWithIndex
+      .map { case (cookieid, index) => cookieid + "\t" + index }
+      .repartition(10)
+      .saveAsTextFile("/home/team016/middata/cookieid_code") // 9276870
+      
+    infoids
+      .distinct
+      .zipWithIndex
+      .map { case (infoid, index) => infoid + "\t" + index }
+      .repartition(10)
+      .saveAsTextFile("/home/team016/middata/infoid_code") // 9699254
   }
   
+  /**
+   * 为click_count中的数据的id转换成编码
+   */
+  def click_count_with_code(sc: SparkContext)
+  {
+    val sep = "\t"
+    val click_count = sc.textFile("/home/team016/middata/click_count/")
+                        .map(_.split("\001")) // cookieid,infoid,click_count
+                        
+    val cookieid_code = sc.textFile("/home/team016/middata/cookieid_code/")
+                          .map(_.split(sep))
+                          .map(values => (values(0), values(1))) // cookieid, index
+                          
+    val infoid_code = sc.textFile("/home/team016/middata/infoid_code")
+                        .map(_.split(sep))
+                        .map(values => (values(0), values(1))) // infoid, index
+                        
+    click_count.map(values => (values(0), (values(1), values(2)))) // cookieid, (infoid,count)
+               .join(cookieid_code)
+               .map { case (cookieid, ((infoid,count), cookieid_index)) => (infoid, (cookieid_index,count)) }
+               .join(infoid_code)
+               .map { case (infoid, ((cookieid_index,count), infoid_index)) => Array(cookieid_index, infoid_index, count).mkString(sep) }
+               .saveAsTextFile("/home/team016/middata/click_count_with_code/")
+  }
+  
+  /**
+   * 为测试集中的数据的id转换成编码
+   */
+  def testdata_with_code(sc: SparkContext)
+  {
+    val sep = "\t"
+    
+    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
+                     .map(_.split("\001"))  // cookieid,infoid
+                     
+    val cookieid_code = sc.textFile("/home/team016/middata/cookieid_code/")
+                          .map(_.split(sep))
+                          .map(values => (values(0), values(1))) // cookieid, index
+                          
+    val infoid_code = sc.textFile("/home/team016/middata/infoid_code")
+                        .map(_.split(sep))
+                        .map(values => (values(0), values(1))) // infoid, index
+                        
+    testdata.map(values => (values(0), values(1)))   // cookieid, infoid
+            .join(cookieid_code)
+               .map { case (cookieid, (infoid, cookieid_index)) => (infoid, cookieid_index) }
+               .join(infoid_code)
+               .map { case (infoid, (cookieid_index, infoid_index)) => Array(cookieid_index, infoid_index).mkString(sep) }
+               .saveAsTextFile("/home/team016/middata/testdata_with_code/")
+  }
+  
+  
+  
+  /**
+   * 测试数据集中的cookieid
+   */
   def testCookieSet(sc: SparkContext) = 
   {
     sc.textFile("/home/team016/middata/test_cookies").collect.toSet
   }
   
-  def sparkContext = new SparkContext(new SparkConf())
+//  def sparkContext = new SparkContext(new SparkConf())
   
   def main(args: Array[String]): Unit = 
   {
@@ -306,6 +398,9 @@ object Extract
       
     if (args(0) == "action")
       Range(1,16).foreach(dt => extractAction(sc, dt))
+      
+    if (args(0) == "delivery")
+      Range(1,16).foreach(dt => extractDelivery(sc, dt))
       
     if (args(0) == "position")
       extractTestPosition(sc)
@@ -326,7 +421,13 @@ object Extract
       testTrainData(sc)
     }
     
+    if (args(0) == "idcode") {
+      idcode(sc)
+    }
     
+    if (args(0) == "click_count_with_code") {
+      click_count_with_code(sc)
+    }
     
     sc.stop()
   }

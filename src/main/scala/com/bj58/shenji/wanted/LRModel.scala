@@ -29,7 +29,7 @@ object LRModel extends Serializable
    */
   val logger = LoggerFactory.getLogger("LRModel")
   
-  def train = 
+  def train(sc: SparkContext) = 
   {
     val sep = "\t"
     val conf = new SparkConf().setAppName("Train").set("spark.driver.allowMultipleContexts", "true")
@@ -149,11 +149,9 @@ object LRModel extends Serializable
   }
   
   
-  def trainPart(part: Int) = 
+  def trainPart(sc: SparkContext, part: Int) = 
   {
     val sep = "\t"
-    val conf = new SparkConf().setAppName("Train" + part)
-    val sc = new SparkContext(conf)
     val testCookies = sc.textFile("/home/team016/middata/test_cookies_split/part" + part).collect
     
     // (cookieid,0),(userid,1),(infoid,2),(clicktag,3),(clicktime,4),(userid,5),(scate1,6),(scate2,7),(scate3,8),(title,9),(local,10),
