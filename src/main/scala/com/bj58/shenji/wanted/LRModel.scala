@@ -226,14 +226,15 @@ object LRModel extends Serializable
 //                              val cleandatas = notclick.subtractByKey(clicks).union(clicks).map(_._2)
                               
                               val actionCount = rawdatas.map { case (action, position) => (action, 1) }.reduceByKey(_ + _).collectAsMap
+                              val needBase = needBaseCount(actionCount)
+                              
                               val jobcates = userJobcates.getOrElse(cookieid, Array())
                               val locals = userLocals.getOrElse(cookieid, Array())
                               
-                              val bactionCount = sc.broadcast(actionCount)
                               val bjobcates = sc.broadcast(jobcates)
                               val blocals = sc.broadcast(locals)
                               
-                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, bactionCount.value) }
+                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, needBase) }
                                                   .cache // .sortBy(_(4).toLong)
                               try {
                                 LogisticRegressionWithSGD.train(datas, 250, 2)
@@ -248,7 +249,6 @@ object LRModel extends Serializable
                                 cookieid + " complete!"
                               } finally {
                                 datas.unpersist(true)
-                                bactionCount.destroy()
                                 bjobcates.destroy()
                                 blocals.destroy()
                               }
@@ -302,14 +302,15 @@ object LRModel extends Serializable
                                                                (action, position) }
                               
                               val actionCount = rawdatas.map { case (action, position) => (action, 1) }.reduceByKey(_ + _).collectAsMap
+                              val needBase = needBaseCount(actionCount)
+                              
                               val jobcates = userJobcates.getOrElse(cookieid, Array())
                               val locals = userLocals.getOrElse(cookieid, Array())
                               
-                              val bactionCount = sc.broadcast(actionCount)
                               val bjobcates = sc.broadcast(jobcates)
                               val blocals = sc.broadcast(locals)
                               
-                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, bactionCount.value) }.cache // .sortBy(_(4).toLong)
+                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, needBase) }.cache // .sortBy(_(4).toLong)
                               try {
                                 val lrmodel = LogisticRegressionWithSGD.train(datas, 250, 2)
                                 val lrscore = testData(cookieid).map(infoposition => (infoposition._1, util.logistic(util.vecdot(lrmodel.weights.toArray,infoposition._2))))
@@ -322,7 +323,6 @@ object LRModel extends Serializable
                                 cookieid + " complete!"
                               } finally {
                                 datas.unpersist(true)
-                                bactionCount.destroy()
                                 bjobcates.destroy()
                                 blocals.destroy()
                               }
@@ -336,7 +336,7 @@ object LRModel extends Serializable
                   e.getValue.map { case (infoid, score) => e.getKey + "\t" + infoid + "\t" + score } }
       .saveAsTextFile("/home/team016/middata/result7/lr")
       
-    sc.parallelize(dtscores.entrySet().toArray)
+    sc.parallelize(dtscores.entrySet().toArray.toSeq)
       .flatMap { entry => val e = entry.asInstanceOf[Entry[String,Array[(String,Double)]]]
                   e.getValue.map { case (infoid, score) => e.getKey + "\t" + infoid + "\t" + score } }
       .saveAsTextFile("/home/team016/middata/result7/dt")
@@ -391,22 +391,29 @@ object LRModel extends Serializable
                                            val enterprice = Enterprise(values.slice(28, 49))
                                            position.enterprise = enterprice
                                            (action, position) }
-                                      
+//                                  .cache()
+                                                        
+//        val notclick = rawdatas.filter(_._1 == "0").map { case (action, position) => (position.infoid, (action, position)) }
+//        val clicks = rawdatas.filter(_._1 != "0").map { case (action, position) => (position.infoid, (action, position)) }
+          
+//        val cleandatas = notclick.subtractByKey(clicks).union(clicks).map(_._2)
+          
           val actionCount = rawdatas.map { case (action, position) => (action, 1) }.reduceByKey(_ + _).collectAsMap
-          val bactionCount = sc.broadcast(actionCount)
+          val needBase = needBaseCount(actionCount)
           val bjobcates = sc.broadcast(userJobcates.getOrElse(cookieid, Array()))
           val blocals = sc.broadcast(locals.getOrElse(cookieid, Array()))
           
-          val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, bactionCount.value) }.cache // .sortBy(_(4).toLong)
           try {
-            LogisticRegressionWithSGD.train(input=datas, numIterations=250, stepSize=2)
+            val lrdatas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, needBase) }.cache // .sortBy(_(4).toLong)
+            LogisticRegressionWithSGD.train(input=lrdatas, numIterations=250, stepSize=2)
               .save(sc, lroutput + "/" + cookieid)
-            DecisionTree.trainRegressor(input=datas, categoricalFeaturesInfo=Map[Int, Int](), impurity="variance", maxDepth=10, maxBins=36)
+            lrdatas.unpersist(false)
+            val dtdatas = rawdatas.flatMap { case (action, position) => labeledPointsDT(action, position, blocals.value, bjobcates.value,bcmcLocal.value, needBase) }.cache // .sortBy(_(4).toLong)
+            DecisionTree.trainRegressor(input=dtdatas, categoricalFeaturesInfo=Map[Int, Int](), impurity="variance", maxDepth=10, maxBins=36)
               .save(sc, dtoutput + "/" + cookieid) // 9:0.6448457311761356
+            dtdatas.unpersist(false)
             accum += 1
           } finally {
-            datas.unpersist(true)
-            bactionCount.destroy()
             bjobcates.destroy()
             blocals.destroy()
           }
@@ -420,10 +427,39 @@ object LRModel extends Serializable
   
   def labeledPoints(action: String, position: Position, 
                     locals: Array[String], jobcates: Array[String], 
-                    cmcLocal: scala.collection.Map[String, String], actionCount: scala.collection.Map[String, Int]) =
+                    cmcLocal: scala.collection.Map[String, String], needBase: Int) =
   {
     val features = Vectors.dense(position.lrFeatures(locals, jobcates, cmcLocal))
-    
+    // 查看电话seetel、在线交谈message、立即申请apply 点击记为1，展现记为0
+    action match {
+      case "seetel" => Range(0,needBase * 10).map(x => LabeledPoint(1, features)).toArray    // 100
+      case "message" => Range(0,needBase * 10).map(x => LabeledPoint(1, features)).toArray
+      case "apply" => Range(0,needBase * 10).map(x => LabeledPoint(1, features)).toArray
+      case "1" => Range(0,needBase).map(x => LabeledPoint(1, features)).toArray        //40
+      case "0" => Array(LabeledPoint(0, features))
+      case _ => Array(LabeledPoint(0, features))
+    }
+  }
+  
+  def labeledPointsDT(action: String, position: Position, 
+                    locals: Array[String], jobcates: Array[String], 
+                    cmcLocal: scala.collection.Map[String, String], needBase: Int) =
+  {
+    val features = Vectors.dense(position.lrFeatures(locals, jobcates, cmcLocal))
+    // 查看电话seetel、在线交谈message、立即申请apply 点击记为1，展现记为0
+    action match {
+      case "seetel" => Range(0,needBase * 10).map(x => LabeledPoint(2, features)).toArray    // 100
+      case "message" => Range(0,needBase * 10).map(x => LabeledPoint(2, features)).toArray
+      case "apply" => Range(0,needBase * 10).map(x => LabeledPoint(2, features)).toArray
+      case "1" => Range(0,needBase).map(x => LabeledPoint(1, features)).toArray        //40
+      case "0" => Array(LabeledPoint(0, features))
+      case _ => Array(LabeledPoint(0, features))
+    }
+  }
+  
+  
+  def needBaseCount(actionCount: scala.collection.Map[String, Int]) =
+  {
     val seetelCount = actionCount.getOrElse("seetel", 0).doubleValue
     val messageCount = actionCount.getOrElse("message", 0).doubleValue
     val applyCount = actionCount.getOrElse("apply", 0).doubleValue
@@ -437,16 +473,7 @@ object LRModel extends Serializable
     
     // 过分抽样，让正负样本的数量相当
     val needBase = (if (deliveryCount == 0) math.round(needNum / actionTotal).intValue else math.floor(needNum / actionTotal).intValue) + 1
-    
-    // 查看电话seetel、在线交谈message、立即申请apply 点击记为1，展现记为0
-    action match {
-      case "seetel" => Range(0,needBase * 10).map(x => LabeledPoint(1, features)).toArray    // 100
-      case "message" => Range(0,needBase * 10).map(x => LabeledPoint(1, features)).toArray
-      case "apply" => Range(0,needBase * 10).map(x => LabeledPoint(1, features)).toArray
-      case "1" => Range(0,needBase).map(x => LabeledPoint(1, features)).toArray        //40
-      case "0" => Array(LabeledPoint(0, features))
-      case _ => Array(LabeledPoint(0, features))
-    }
+    needBase
   }
   
 //  def labeledPoint(values: Array[String]) =
