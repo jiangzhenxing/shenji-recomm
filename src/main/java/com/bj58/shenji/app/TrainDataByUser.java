@@ -18,6 +18,7 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
+import org.netlib.util.intW;
 
 public class TrainDataByUser extends Configured implements Tool 
 {
@@ -29,7 +30,7 @@ public class TrainDataByUser extends Configured implements Tool
 		public void map(LongWritable inKey, Text inValue, Context context) throws IOException, InterruptedException
 		{
 			String record = inValue.toString();
-			outKey.set(record.substring(0, record.indexOf("\t")));
+			outKey.set(record.substring(0, record.indexOf("\001")));
 			context.write(outKey, inValue);
 		}
 	}
@@ -95,8 +96,10 @@ public class TrainDataByUser extends Configured implements Tool
         job.setOutputValueClass(Text.class);
 		job.setNumReduceTasks(120);
 		
-		FileInputFormat.addInputPath(job, new Path("/home/team016/middata/test_train_data/"));  // 11075-19881166
-		FileOutputFormat.setOutputPath(job, new Path("/home/team016/middata/traindatabyuser/"));// 11176-19881166
+		for (int i = 1; i < 16; i++)
+			FileInputFormat.addInputPath(job, new Path("/home/team016/middata/traindata/dt=" + i));  // 11075-19881166
+		
+		FileOutputFormat.setOutputPath(job, new Path("/home/team016/middata/traindatabyuser2/"));// 11176-19881166
 		
 		return job.waitForCompletion(true) ? 0 : 1;
 	}

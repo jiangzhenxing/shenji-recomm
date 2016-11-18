@@ -96,6 +96,7 @@ object DTModel extends Serializable
 						 enttype = values(15),
 						 fresh = values(17),
 						 fuli = values(16),
+						 highlights = "",
 						 additional = values(18)
 						 )
   }

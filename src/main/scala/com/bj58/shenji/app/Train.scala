@@ -5,9 +5,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.broadcast.Broadcast
 
 import com.bj58.shenji.data._
-import com.bj58.shenji.wanted.LRModel
-import com.bj58.shenji.wanted.DTModel
-import com.bj58.shenji.wanted.CFModel
+import com.bj58.shenji.wanted._
 
 /**
  * 模型训练
@@ -19,8 +17,8 @@ object Train
     val conf = new SparkConf().setAppName("Train " + args(0))
     val sc = new SparkContext(conf)
     
-    if (args(0) == "LR")
-      LRModel.train(sc)
+    if (args(0) == "train")
+      LRModel.trainAll(sc)
       
       
     if (args(0) == "LRPart")
@@ -32,6 +30,11 @@ object Train
       println("***************** TRAIN CF END *********************")
     }
       
+    if (args(0) == "MODELS") {
+      println("***************** TRAIN MODELS BEGIN *********************")
+      trainModels(sc)
+      println("***************** TRAIN MODELS END *********************")
+    }
       
 //    if (args(0) == "DT")
 //      DTModel.train(sc)

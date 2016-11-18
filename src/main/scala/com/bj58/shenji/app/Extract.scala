@@ -14,6 +14,7 @@ import com.bj58.shenji.data._
 import com.bj58.shenji.util._
 import org.apache.hadoop.io.NullWritable
 import org.apache.spark.Partitioner
+import org.dmg.pmml.False
 
 /**
  * 数据抽取
@@ -97,7 +98,7 @@ object Extract
   }
   
   /**
-   * 提取测试集中的用户的点击事件关联职位信息
+   * 提取测试集中的用户投递职位信息
    */
   def extractDelivery(sc: SparkContext, dt: Int) = 
   {
@@ -120,6 +121,100 @@ object Extract
   }
   
   /**
+   * 抽取训练数据
+   */
+  def extractTrainData(sc: SparkContext) = 
+  {
+    val testCookies = testCookieSet(sc)
+    val bcookies = sc.broadcast(testCookies)
+    val sep = "\001"
+    
+    Range(1,16).foreach { dt => 
+      println("Extract " + dt)
+      val position = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=" + dt)
+                       .map(line => (Position(line).userid, line))
+                       
+      val enterprise_user = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/enterprise_re_user/dt=" + dt)
+                              .map(EnterpriseUser(_))
+                              .map(user => (user.userid, user.enterpriseid)) // userid, enterpriseid
+                              
+      val enterprise = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/enterprise/dt=" + dt)
+                         .map(line => (Enterprise(line).id, line))
+                         
+      val positionEnterprise = position.leftOuterJoin(enterprise_user)
+                                      .map { case (userid, (position, enterpriseid)) => (if (enterpriseid == None) "-" else enterpriseid.get, position) }
+                                      .leftOuterJoin(enterprise)
+                                      .map { case (enterpriseid, (position, enterprise)) => (Position(position).infoid, (position, if (enterprise == None) "" else enterprise.get)) }
+              
+      val detail = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/detail/dt=" + dt)
+                     .map(JobListRecord(_))
+                     .filter(record => bcookies.value.contains(record.cookieid))
+                     .map(r => (r.infoid,Array(r.cookieid,r.userid,r.infoid,r.clicktag,if (r.clicktag == "1") r.clicktime else r.stime).mkString(sep)))
+      
+      val action = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/useraction/dt=" + dt)
+                     .map(UserActionRecord(_))
+                     .filter(r => bcookies.value.contains(r.cookieid))
+                     .map(r => (r.infoid, Array(r.cookieid, r.userid, r.infoid, r.clicktag, r.clicktime).mkString(sep)))
+                     
+      val delivery = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/delivery/dt=" + dt)
+                     .map(DeliveryRecord(_))
+                     .filter(r => bcookies.value.contains(r.cookieid))
+                     .map(r => (r.infoid, Array(r.cookieid, r.resumeuserid, r.infoid, "apply", r.deliverytime).mkString(sep)))
+                     
+      detail.union(action)
+            .union(delivery)
+            .join(positionEnterprise)
+            .map { case (infoid, (detail, (position, enterprise))) => detail + sep + position + sep + enterprise } // 5 + 23 + 21
+            .repartition(10)
+            .saveAsTextFile("/home/team016/middata/traindata/dt=" + dt)
+    }
+  }
+  
+  /**
+   * 提取用户点击的工作类别
+   */
+  def extractUserJobCates(sc: SparkContext) =
+  {
+    import com.bj58.shenji.data.Position
+    val sep = "\001"
+    val traindata = sc.textFile("/home/team016/middata/traindata/*")
+    traindata.map(_.split(sep)) // detail:0-5; position:5-29; enterprise:29-51
+             .filter(_(3) != "0")
+             .map { values => val p = Position(values.slice(5,29))
+                              (values(0), Seq(p.scate1,p.scate2,p.scate3).mkString(",")) }
+             .distinct
+             .groupBy(_._1)
+             .map { case (cookieid, iter) => cookieid + sep + iter.map(_._2).mkString(";") }
+             .repartition(1)
+             .saveAsTextFile("/home/team016/middata/user_job_cates/")
+  }
+  
+  /**
+   * 提取用户点击的二级地域
+   */
+  def extractUserLocals(sc: SparkContext) =
+  {
+    import com.bj58.shenji.data.Position
+    val sep = "\001"
+    val locals = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/ds_dict_cmc_local")
+                   .map(_.split(sep))
+                   .map(values => (values(0), values(3).split("\002").slice(0, 2).mkString(",")))
+                   .collectAsMap
+    val blocals = sc.broadcast(locals)
+    
+    val traindata = sc.textFile("/home/team016/middata/traindata/*")
+    traindata.map(_.split(sep)) // detail:0-5; position:5-29; enterprise:29-51
+             .filter(_(3) != "0")
+             .flatMap { values => val p = Position(values.slice(5,29))
+                              p.local.split(",").map(local => (values(0), blocals.value.getOrElse(local,"-"))) }
+             .distinct
+             .groupBy(_._1)
+             .map { case (cookieid, iter) => cookieid + sep + iter.map(_._2).mkString(";") }
+             .repartition(1)
+             .saveAsTextFile("/home/team016/middata/user_locals2/")
+  }
+  
+  /**
    * 抽取测试数据中的职位信息
    */
   def extractTestPosition(sc: SparkContext) =
@@ -134,10 +229,43 @@ object Extract
                       .map(p => (p.substring(0, p.indexOf("\001")).trim, p))  // infoid, position
                       
     testdata.leftOuterJoin(positions)
-            .map { case (infoid, (cookieid,position)) => (cookieid, if (position == None) None else Some(Position(position.get))) }
-            .map { case (cookieid, option) =>  if (option == None) cookieid + sep + "--" else { val p = option.get; Array(cookieid,p.infoid,p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep) } }
+            .map { case (infoid, (cookieid,position)) => (cookieid, infoid, if (position == None) None else Some(Position(position.get))) }
+            .map { case (cookieid, infoid, option) =>  if (option == None) cookieid + sep + infoid + sep + "--" else { val p = option.get; Array(cookieid,p.infoid,p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep) } }
             .repartition(1)
             .saveAsTextFile("/home/team016/middata/test_user_position/") // 949258  961957 12699
+  }
+  
+  /**
+   * 抽取测试数据
+   */
+  def extractTestData(sc: SparkContext) =
+  {
+    val sep = "\001"
+    
+    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
+                     .map(_.split("\001"))
+                     .map(values => (values(1).trim, values(0))) // infoid, cookieid
+                     
+    val positions = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=16")
+                      .map(line => (Position(line).userid, line))  // userid, position
+                      
+    val enterprise_user = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/enterprise_re_user/dt=16")
+                            .map(EnterpriseUser(_))
+                            .map(user => (user.userid, user.enterpriseid)) // userid, enterpriseid
+                            
+    val enterprise = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/enterprise/dt=16")
+                       .map(line => (Enterprise(line).id, line))
+                       
+    val positionEnterprise = positions.leftOuterJoin(enterprise_user)
+                                      .map { case (userid, (position, enterpriseid)) => (if (enterpriseid == None) "-" else enterpriseid.get, position) }
+                                      .leftOuterJoin(enterprise)
+                                      .map { case (enterpriseid, (position, enterprise)) => (Position(position).infoid, (position, if (enterprise == None) "" else enterprise.get)) }
+                                      // infoid,(position,enterprise)
+              
+    testdata.leftOuterJoin(positionEnterprise)
+            .map { case (infoid, (cookieid,pe)) => cookieid + sep + infoid + sep +  (if (pe == None) "--" else pe.get._1 + sep + pe.get._2) }
+            .repartition(1)
+            .saveAsTextFile("/home/team016/middata/testdata/") // 949258  961957 12699
   }
   
   /**
@@ -258,6 +386,9 @@ object Extract
                       writer.close() }
   }
   
+  /**
+   * 抽取训练数据
+   */
   def testTrainData(sc: SparkContext) =
   {
     val sep = "\t"
@@ -266,20 +397,23 @@ object Extract
     // 87895
     val action_position = sc.textFile("/home/team016/middata/test_action_position/*")
     
+    val delivery_position = sc.textFile("/home/team016/middata/test_delivery_position/*")
+    
     // (cookieid,0),(userid,1),(infoid,2),(clicktag,3),(clicktime,4),(userid,5),(scate1,6),(scate2,7),(scate3,8),(title,9),(local,10),
     // (salary,11),(education,12),(experience,13),(trade,14),(enttype,15),(fuli,16),(fresh,17),(additional,18)
     list_position.union(action_position)
+                 .union(delivery_position)
                  .sortBy(record => { val values = record.split(sep); values(0) + sep + values(4) }, true, 5)
-                 .saveAsTextFile("/home/team016/middata/test_train_data/")
+                 .saveAsTextFile("/home/team016/middata/test_train_data_all/")
   }
   
   def splitUser(sc: SparkContext)
   {
     val testCookie = sc.textFile("/home/team016/middata/test_cookies").collect
-    val size = 6000
+    val size = 3000
     Range(0, testCookie.size, size).map(begin => testCookie.slice(begin, begin + size))
                                    .zipWithIndex
-                                   .foreach { case (values, index) => sc.parallelize(values).saveAsTextFile("/home/team016/middata/test_cookies_split/part" + index) }
+                                   .foreach { case (values, index) => sc.parallelize(values).saveAsTextFile("/home/team016/middata/test_cookies_split4/part" + index) }
   }
   
   /**
@@ -374,6 +508,56 @@ object Extract
   }
   
   
+  /**
+   * 为训练集中的数据的id转换成编码
+   */
+  def traindata_with_code(sc: SparkContext)
+  {
+    val sep = "\t"
+    
+    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
+                     .map(_.split("\001"))  // cookieid,infoid
+                     
+    val cookieid_code = sc.textFile("/home/team016/middata/cookieid_code/")
+                          .map(_.split(sep))
+                          .map(values => (values(0), values(1))) // cookieid, index
+                          
+    val infoid_code = sc.textFile("/home/team016/middata/infoid_code")
+                        .map(_.split(sep))
+                        .map(values => (values(0), values(1))) // infoid, index
+                        
+    testdata.map(values => (values(0), values(1)))   // cookieid, infoid
+            .join(cookieid_code)
+               .map { case (cookieid, (infoid, cookieid_index)) => (infoid, cookieid_index) }
+               .join(infoid_code)
+               .map { case (infoid, (cookieid_index, infoid_index)) => Array(cookieid_index, infoid_index).mkString(sep) }
+               .saveAsTextFile("/home/team016/middata/testdata_with_code/")
+  }
+  
+  def extractAllScore(sc: SparkContext) =
+  {
+    val testCookies = sc.textFile("/home/team016/middata/test_cookies").collect
+    testCookies.foreach { cookieid =>
+        val lrdtScore = sc.textFile("/home/team016/middata/result10/lrdt/" + cookieid)    // cookieid, infoid, lrscore, dtscore, label
+                          .map(_.split("\t"))
+                          .map{ case Array(cookieid, infoid, lrscore, dtscore, label) => (cookieid + "\t" + infoid, (lrscore, dtscore, label)) }
+                          .cache
+//        val cfScore = sc.textFile("/home/team016/middata/result10/cf/" + cookieid)        // cookieid, infoid, rating, label
+//                        .map(_.split("\t"))
+//                        .map { case Array(cookieid, infoid, rating, label) => (cookieid + "\t" + infoid, rating) }
+        
+        val clickScore = sc.textFile("/home/team016/middata/result10/click/" + cookieid)  // infoid, avgClick, label
+                           .map(_.split("\t"))
+                           .map { case Array(infoid, avgClick, label) => (cookieid + "\t" + infoid, avgClick) }
+                           .cache
+        lrdtScore.join(clickScore)
+                 .map { case (cookie_info, ((lrscore, dtscore, label), avgClick)) => Array(cookie_info, lrscore, dtscore, avgClick, label).mkString("\t") }
+                 .saveAsTextFile("/home/team016/middata/result10/all/" + cookieid)
+                 
+        lrdtScore.unpersist(false)
+        clickScore.unpersist(false)
+    }
+  }
   
   /**
    * 测试数据集中的cookieid
@@ -427,6 +611,20 @@ object Extract
     
     if (args(0) == "click_count_with_code") {
       click_count_with_code(sc)
+    }
+    
+    if (args(0) == "extractTrainData") {
+      println("************** extractTrainData begin ********************")
+      extractTrainData(sc)
+    }
+    
+    if (args(0) == "extractTestData") {
+      println("************** extractTestData begin ********************")
+      extractTestData(sc)
+    }
+    
+    if (args(0) == "extractAllScore") {
+      extractAllScore(sc)
     }
     
     sc.stop()

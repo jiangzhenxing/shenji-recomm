@@ -9,7 +9,6 @@ import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.classification.LogisticRegressionWithSGD
 import org.apache.spark.mllib.tree.DecisionTree
 
-import com.bj58.shenji.data.Position
 import org.apache.spark.SparkConf
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -18,6 +17,13 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
 import org.dmg.pmml.True
+
+import com.bj58.shenji.data.Position
+import com.bj58.shenji.util
+import com.bj58.shenji.data.Enterprise
+import org.apache.spark.mllib.classification.LogisticRegressionModel
+import org.jboss.netty.util.internal.ConcurrentHashMap
+import java.util.Map.Entry
 
 /**
  * 逻辑回归模型
@@ -59,8 +65,8 @@ object LRModel extends Serializable
     
 //    val accum = sc.accumulator(0, "SUCESS_COUNT")
     
-    testCookies.map { cookieid =>
-      println(cookieid)
+//    testCookies.map { cookieid =>
+//      println(cookieid)
 //      try {
 //                              val train_data = sc.textFile("/home/team016/middata/traindatabyuser/" + cookieid + "-*")
 //                              val rawdatas = train_data.map(_.split("\t")).map(values => (values(3), position(values)))
@@ -80,33 +86,33 @@ object LRModel extends Serializable
 //                      } catch {
 //                               case t: Throwable => logger.error(cookieid, t)
 //                     }
-                        executor.submit(new Callable[String]() {
-                          def call = {
-                            try {
-                              val sc = localsc.get
-                              val train_data = sc.textFile("/home/team016/middata/traindatabyuser/" + cookieid + "-*")
-                              val rawdatas = train_data.map(_.split("\t")).map(values => (values(3), position(values)))
-                              val actionCount = rawdatas.map { case (action, position) => (action,1) }.reduceByKey(_ + _).collectAsMap
-                              val bactionCount = sc.broadcast(actionCount)
-                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, bactionCount.value) }.cache // .sortBy(_(4).toLong)
-                              try {
-                                LogisticRegressionWithSGD.train(datas, 250, 2)
-                                                         .save(sc, "/home/team016/middata/model/lr4/" +cookieid)
-                                DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity="variance", maxDepth=10, maxBins=36)
-                                          .save(sc, "/home/team016/middata/model/dt4/" + cookieid) // 9:0.6448457311761356
-//                                accum += 1
-                                } finally {
-                                datas.unpersist(true)
-                                bactionCount.destroy()
-                              }
-                              cookieid
-                            } catch {
-                               case t: Throwable => throw new RuntimeException(cookieid, t)
-                            }
-                          }
-                    })
-                  }
-            .foreach(f => try { logger.info(f.get + " has complete in lrmodel") } catch { case e: Exception => logger.error(e.getMessage + "  in lrmodel", e) } )
+//                        executor.submit(new Callable[String]() {
+//                          def call = {
+//                            try {
+//                              val sc = localsc.get
+//                              val train_data = sc.textFile("/home/team016/middata/traindatabyuser/" + cookieid + "-*")
+//                              val rawdatas = train_data.map(_.split("\t")).map(values => (values(3), position(values)))
+//                              val actionCount = rawdatas.map { case (action, position) => (action,1) }.reduceByKey(_ + _).collectAsMap
+//                              val bactionCount = sc.broadcast(actionCount)
+//                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, bactionCount.value) }.cache // .sortBy(_(4).toLong)
+//                              try {
+//                                LogisticRegressionWithSGD.train(datas, 250, 2)
+//                                                         .save(sc, "/home/team016/middata/model/lr4/" +cookieid)
+//                                DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity="variance", maxDepth=10, maxBins=36)
+//                                          .save(sc, "/home/team016/middata/model/dt4/" + cookieid) // 9:0.6448457311761356
+////                                accum += 1
+//                                } finally {
+//                                datas.unpersist(true)
+//                                bactionCount.destroy()
+//                              }
+//                              cookieid
+//                            } catch {
+//                               case t: Throwable => throw new RuntimeException(cookieid, t)
+//                            }
+//                          }
+//                    })
+//                  }
+//            .foreach(f => try { logger.info(f.get + " has complete in lrmodel") } catch { case e: Exception => logger.error(e.getMessage + "  in lrmodel", e) } )
     
 //    cookieid => (cookieid, train_data.filter(record => record.substring(0, record.indexOf("\t")) == cookieid)))
 //                            .map { case (cookieid, records) => 
@@ -126,7 +132,7 @@ object LRModel extends Serializable
 //                                        }
 //                                      }) }
 //                              .foreach(f => try { logger.info(f.get + " has complete") } catch { case e: Exception => logger.error(e.getMessage, e) } )
-    executor.awaitTermination(10, TimeUnit.DAYS)
+//    executor.awaitTermination(10, TimeUnit.DAYS)
 //    sc.stop()
 //    sc.parallelize(result).map(_.get()).saveAsTextFile("/home/team016/middata/model/lr/")
     
@@ -148,50 +154,268 @@ object LRModel extends Serializable
 //                 .saveAsTextFile("/home/team016/middata/model/LR")
   }
   
-  
-  def trainPart(sc: SparkContext, part: Int) = 
+  def testDatas(sc: SparkContext, testCookies: Set[String],
+                userLocals: scala.collection.Map[String, Array[String]],
+                userJobCates: scala.collection.Map[String, Array[String]],
+                cmcLocal: scala.collection.Map[String, String]): scala.collection.Map[String, Array[(String,Array[Double])]] = //
   {
+    val sep = "\001"
+    var preCookieid = ""
+    var model: LogisticRegressionModel = null
+    val bcookies = sc.broadcast(testCookies)
+    val test_data = sc.textFile("/home/team016/middata/testdata/")
+                           
+    test_data.map(_.split(sep))
+             .filter(_.length > 2)
+             .filter(values => bcookies.value.contains(values(0)))
+             .groupBy(_(0)) // cookieid + sep + infoid +  (if (pe == None) "--" else position + sep + enterprise) 1 + 1 + 23 + 21
+             .map { case (cookieid, iter) => 
+                      val features = iter.map { values =>
+                                     val position = Position(values.slice(2, 25))
+                                     val enterprise = Enterprise(values.slice(25, 46))
+                                     position.enterprise = enterprise 
+                                     (position.infoid, position.lrFeatures(userLocals.getOrElse(cookieid, Array()), userJobCates.getOrElse(cookieid, Array()), cmcLocal)) }
+                              .toArray 
+                      (cookieid, features) }
+             .collectAsMap
+  }
+  
+  def lrEval(model: LogisticRegressionModel, datas: Array[Position],
+            locals: Array[String], jobcates: Array[String], 
+            cmcLocal: scala.collection.Map[String, String], actionCount: scala.collection.Map[String, Int]) =
+  {
+    datas.map(position => (position.infoid, util.logistic(util.vecdot(model.weights.toArray,position.lrFeatures(locals, jobcates, cmcLocal)))))
+  }
+  
+  def trainConcurrent(sc: SparkContext, cookiePath: String, lroutput: String, dtoutput: String) =
+  {
+    val executor = Executors.newFixedThreadPool(16)
     val sep = "\t"
-    val testCookies = sc.textFile("/home/team016/middata/test_cookies_split/part" + part).collect
+    val testCookies = sc.textFile(cookiePath).collect.toSet
+    val userJobcates = util.userJobcates(sc)
+    val userLocals = util.userLocals(sc)
+    val cmcLocal = util.cmcLocal(sc)
+    val bcmcLocal = sc.broadcast(cmcLocal)
+//    val testData = testDatas(sc, testCookies, userLocals, userJobcates, cmcLocal)
     
-    // (cookieid,0),(userid,1),(infoid,2),(clicktag,3),(clicktime,4),(userid,5),(scate1,6),(scate2,7),(scate3,8),(title,9),(local,10),
-    // (salary,11),(education,12),(experience,13),(trade,14),(enttype,15),(fuli,16),(fresh,17),(additional,18)
-    val accum = sc.accumulator(0, "SUCESS_COUNT")
+//    val lrscores = new ConcurrentHashMap[String,Array[(String,Double)]]()
+//    val dtscores = new ConcurrentHashMap[String,Array[(String,Double)]]()
     
     testCookies.map { cookieid =>
-      println(cookieid)
-      try {
-                              val train_data = sc.textFile("/home/team016/middata/traindatabyuser/" + cookieid + "-*")
-                              val rawdatas = train_data.map(_.split("\t")).map(values => (values(3), position(values)))
-                              val actionCount = rawdatas.map { case (action, position) => (action,1) }.reduceByKey(_ + _).collectAsMap
+      executor.submit(new Callable[String]() with Serializable {
+                          def call = {
+                            println(cookieid)
+                            try {
+                              val train_data = sc.textFile("/home/team016/middata/traindatabyuser2/" + cookieid + "-*")
+                              /*
+                               * // 5 + 23 + 21 detail:0-5; position:5-25; enterprise:29-49
+                                 .map { values => val p = Position(values.slice(5,29))
+                               */
+                              val rawdatas = train_data.map(_.split("\001"))
+                                                       .map { values => 
+                                                               val action = values(3)
+                                                               val position = Position(values.slice(5,28))
+                                                               val enterprice = Enterprise(values.slice(28, 49))
+                                                               position.enterprise = enterprice
+                                                               (action, position) }
+                              
+                              val actionCount = rawdatas.map { case (action, position) => (action, 1) }.reduceByKey(_ + _).collectAsMap
+                              val jobcates = userJobcates.getOrElse(cookieid, Array())
+                              val locals = userLocals.getOrElse(cookieid, Array())
+                              
                               val bactionCount = sc.broadcast(actionCount)
-                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, bactionCount.value) }.cache // .sortBy(_(4).toLong)
+                              val bjobcates = sc.broadcast(jobcates)
+                              val blocals = sc.broadcast(locals)
+                              
+                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, bactionCount.value) }.cache // .sortBy(_(4).toLong)
                               try {
                                 LogisticRegressionWithSGD.train(datas, 250, 2)
-                                                         .save(sc, "/home/team016/middata/model/lr5/" +cookieid)
-                                DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity="variance", maxDepth=10, maxBins=36)
-                                            .save(sc, "/home/team016/middata/model/dt5/" + cookieid) // 9:0.6448457311761356
-                                accum += 1
+                                                         .save(sc, lroutput + "/" + cookieid)
+//                                val lrscore = testData(cookieid).map(infoposition => (infoposition._1, util.logistic(util.vecdot(lrmodel.weights.toArray,infoposition._2))))
+//                                lrscores.put(cookieid, lrscore)
+                                //                                  
+                                DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity = "variance", maxDepth = 10, maxBins = 36)
+                                            .save(sc, dtoutput + "/" + cookieid) // 9:0.6448457311761356
+//                                val dtscore = testData(cookieid).map(position => (position._1, dtmodel.predict(Vectors.dense(position._2))))
+//                                dtscores.put(cookieid, dtscore)
+                                cookieid + " complete!"
                               } finally {
                                 datas.unpersist(true)
                                 bactionCount.destroy()
+                                bjobcates.destroy()
+                                blocals.destroy()
                               }
-                      } catch {
-                               case t: Throwable => logger.error(cookieid, t)
-                     }
-                  }
-            .foreach(c => println(c + " has complete in lrmodel"))
-    sc.stop()
-  }
-  
-  def evalute() =
-  {
+                            } catch {
+                              case t: Throwable => { t.printStackTrace(); cookieid + " error: " + t.getMessage } // logger.error("", t)
+                            }
+                          }
+                    })
+    }.foreach { f => println(f.get) }
+    executor.shutdown()
     
+//    sc.parallelize(lrscores.entrySet().toArray.toSeq)
+//      .flatMap { entry => val e = entry.asInstanceOf[Entry[String,Array[(String,Double)]]]
+//                  e.getValue.map { case (infoid, score) => e.getKey + "\t" + infoid + "\t" + score } }
+//      .saveAsTextFile("/home/team016/middata/result6/lr")
+//      
+//    sc.parallelize(dtscores.entrySet().toArray)
+//      .flatMap { entry => val e = entry.asInstanceOf[Entry[String,Array[(String,Double)]]]
+//                  e.getValue.map { case (infoid, score) => e.getKey + "\t" + infoid + "\t" + score } }
+//      .saveAsTextFile("/home/team016/middata/result6/dt")
   }
   
-  def labeledPoints(action: String, position: Position, actionCount: scala.collection.Map[String, Int]) =
+  
+  def trainAndEval(sc: SparkContext, cookiePath: String) =
   {
-    val features = Vectors.dense(position.lrFeatures)
+    val sep = "\t"
+    val testCookies = sc.textFile(cookiePath).collect.toSet
+    val userJobcates = util.userJobcates(sc)
+    val userLocals = util.userLocals(sc)
+    val cmcLocal = util.cmcLocal(sc)
+    val bcmcLocal = sc.broadcast(cmcLocal)
+    val testData = testDatas(sc, testCookies, userLocals, userJobcates, cmcLocal)
+    
+    val lrscores = new ConcurrentHashMap[String,Array[(String,Double)]]()
+    val dtscores = new ConcurrentHashMap[String,Array[(String,Double)]]()
+    
+    testCookies.map { cookieid =>
+                            println(cookieid)
+                            try {
+                              val train_data = sc.textFile("/home/team016/middata/traindatabyuser2/" + cookieid + "-*")
+                              /*
+                               * // 5 + 23 + 21 detail:0-5; position:5-25; enterprise:29-49
+                                 .map { values => val p = Position(values.slice(5,29))
+                               */
+                              val rawdatas = train_data.map(_.split("\001"))
+                                                       .map { values => 
+                                                               val action = values(3)
+                                                               val position = Position(values.slice(5,28))
+                                                               val enterprice = Enterprise(values.slice(28, 49))
+                                                               position.enterprise = enterprice
+                                                               (action, position) }
+                              
+                              val actionCount = rawdatas.map { case (action, position) => (action, 1) }.reduceByKey(_ + _).collectAsMap
+                              val jobcates = userJobcates.getOrElse(cookieid, Array())
+                              val locals = userLocals.getOrElse(cookieid, Array())
+                              
+                              val bactionCount = sc.broadcast(actionCount)
+                              val bjobcates = sc.broadcast(jobcates)
+                              val blocals = sc.broadcast(locals)
+                              
+                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, bactionCount.value) }.cache // .sortBy(_(4).toLong)
+                              try {
+                                val lrmodel = LogisticRegressionWithSGD.train(datas, 250, 2)
+                                val lrscore = testData(cookieid).map(infoposition => (infoposition._1, util.logistic(util.vecdot(lrmodel.weights.toArray,infoposition._2))))
+                                lrscores.put(cookieid, lrscore)
+                                //                                  .save(sc, lroutput + "/" + cookieid)
+                                val dtmodel = DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity = "variance", maxDepth = 10, maxBins = 36)
+//                                  .save(sc, dtoutput + "/" + cookieid) // 9:0.6448457311761356
+                                val dtscore = testData(cookieid).map(position => (position._1, dtmodel.predict(Vectors.dense(position._2))))
+                                dtscores.put(cookieid, dtscore)
+                                cookieid + " complete!"
+                              } finally {
+                                datas.unpersist(true)
+                                bactionCount.destroy()
+                                bjobcates.destroy()
+                                blocals.destroy()
+                              }
+                            } catch {
+                              case t: Throwable => { t.printStackTrace(); cookieid + " error: " + t.getMessage } // logger.error("", t)
+                            }
+    }
+    
+    sc.parallelize(lrscores.entrySet().toArray.toSeq)
+      .flatMap { entry => val e = entry.asInstanceOf[Entry[String,Array[(String,Double)]]]
+                  e.getValue.map { case (infoid, score) => e.getKey + "\t" + infoid + "\t" + score } }
+      .saveAsTextFile("/home/team016/middata/result7/lr")
+      
+    sc.parallelize(dtscores.entrySet().toArray)
+      .flatMap { entry => val e = entry.asInstanceOf[Entry[String,Array[(String,Double)]]]
+                  e.getValue.map { case (infoid, score) => e.getKey + "\t" + infoid + "\t" + score } }
+      .saveAsTextFile("/home/team016/middata/result7/dt")
+  }
+  
+  def trainAll(sc: SparkContext) =
+  {
+    // /home/team016/middata/model5/
+//    train2(sc, "/home/team016/middata/test_cookies",
+//              "/home/team016/middata/model5/lr",
+//              "/home/team016/middata/model5/dt")
+//    trainAndEval(sc, "/home/team016/middata/test_cookies")
+    trainConcurrent(sc, "/home/team016/middata/test_cookies", 
+                        "/home/team016/middata/model9/lr",
+                        "/home/team016/middata/model9/dt")
+  }
+  
+  def trainPart(sc: SparkContext, part: Int) =
+  {
+    trainConcurrent(sc, "/home/team016/middata/test_cookies_split4/part" + part, 
+                        "/home/team016/middata/model3/lr/part" + part,
+                        "/home/team016/middata/model3/dt/part" + part)
+//    train2(sc, "/home/team016/middata/test_cookies_split4/part" + part,
+//              "/home/team016/middata/model/lr6/part" + part,
+//              "/home/team016/middata/model/dt6/part" + part)
+  }
+  
+  def train2(sc: SparkContext, cookiePath: String, lroutput: String, dtoutput: String) =
+  {
+      val sep = "\t"
+      val testCookies = sc.textFile(cookiePath).collect
+      val userJobcates = util.userJobcates(sc)
+      val locals = util.userLocals(sc)
+      val cmcLocal = util.cmcLocal(sc)
+      val bcmcLocal = sc.broadcast(cmcLocal)
+      // (cookieid,0),(userid,1),(infoid,2),(clicktag,3),(clicktime,4),(userid,5),(scate1,6),(scate2,7),(scate3,8),(title,9),(local,10),
+      // (salary,11),(education,12),(experience,13),(trade,14),(enttype,15),(fuli,16),(fresh,17),(additional,18)
+      val accum = sc.accumulator(0, "SUCESS_COUNT")
+
+      testCookies.map { cookieid =>
+        println(cookieid)
+        try {
+          val train_data = sc.textFile("/home/team016/middata/traindatabyuser2/" + cookieid + "-*")
+          /*
+           * // 5 + 23 + 21 detail:0-5; position:5-25; enterprise:29-49
+             .map { values => val p = Position(values.slice(5,29))
+           */
+          val rawdatas = train_data.map(_.split("\001"))
+                                   .map { values => 
+                                           val action = values(3)
+                                           val position = Position(values.slice(5,28))
+                                           val enterprice = Enterprise(values.slice(28, 49))
+                                           position.enterprise = enterprice
+                                           (action, position) }
+                                      
+          val actionCount = rawdatas.map { case (action, position) => (action, 1) }.reduceByKey(_ + _).collectAsMap
+          val bactionCount = sc.broadcast(actionCount)
+          val bjobcates = sc.broadcast(userJobcates.getOrElse(cookieid, Array()))
+          val blocals = sc.broadcast(locals.getOrElse(cookieid, Array()))
+          
+          val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, bactionCount.value) }.cache // .sortBy(_(4).toLong)
+          try {
+            LogisticRegressionWithSGD.train(input=datas, numIterations=250, stepSize=2)
+              .save(sc, lroutput + "/" + cookieid)
+            DecisionTree.trainRegressor(input=datas, categoricalFeaturesInfo=Map[Int, Int](), impurity="variance", maxDepth=10, maxBins=36)
+              .save(sc, dtoutput + "/" + cookieid) // 9:0.6448457311761356
+            accum += 1
+          } finally {
+            datas.unpersist(true)
+            bactionCount.destroy()
+            bjobcates.destroy()
+            blocals.destroy()
+          }
+        } catch {
+          case t: Throwable => logger.error(cookieid, t)
+        }
+      }
+        .foreach(c => println(c + " has complete in lrmodel"))
+      sc.stop()
+  }
+  
+  def labeledPoints(action: String, position: Position, 
+                    locals: Array[String], jobcates: Array[String], 
+                    cmcLocal: scala.collection.Map[String, String], actionCount: scala.collection.Map[String, Int]) =
+  {
+    val features = Vectors.dense(position.lrFeatures(locals, jobcates, cmcLocal))
     
     val seetelCount = actionCount.getOrElse("seetel", 0).doubleValue
     val messageCount = actionCount.getOrElse("message", 0).doubleValue
@@ -218,61 +442,62 @@ object LRModel extends Serializable
     }
   }
   
-  def labeledPoint(values: Array[String]) =
-  {
-    val p = position(values)
-    val features = Vectors.dense(p.lrFeatures)
-    
-    // 查看电话seetel、在线交谈message、立即申请apply 点击记为1，展现记为0
-    val label = values(3) match {
-      case "seetel" => 1.0
-      case "message" => 1.0
-      case "apply" => 1.0
-      case "1" => 1.0
-      case "0" => 0.0
-      case _ => 0.0
-    }
-    
-    LabeledPoint(label, features)
-  }
+//  def labeledPoint(values: Array[String]) =
+//  {
+//    val p = position(values)
+//    val features = Vectors.dense(p.lrFeatures)
+//    
+//    // 查看电话seetel、在线交谈message、立即申请apply 点击记为1，展现记为0
+//    val label = values(3) match {
+//      case "seetel" => 1.0
+//      case "message" => 1.0
+//      case "apply" => 1.0
+//      case "1" => 1.0
+//      case "0" => 0.0
+//      case _ => 0.0
+//    }
+//    
+//    LabeledPoint(label, features)
+//  }
   
-  def labelFetures(values: Array[String]) =
-  {
-    val p = position(values)
-    val features = p.lrFeatures
-    
-    // 查看电话seetel、在线交谈message、立即申请apply 点击记为1，展现记为0
-    val label = values(3) match {
-      case "seetel" => 1.0
-      case "message" => 1.0
-      case "apply" => 1.0
-      case "1" => 1.0
-      case "0" => 0.0
-      case _ => 0.0
-    }
-    
-    (label, features)
-  }
+//  def labelFetures(values: Array[String]) =
+//  {
+//    val p = position(values)
+//    val features = p.lrFeatures
+//    
+//    // 查看电话seetel、在线交谈message、立即申请apply 点击记为1，展现记为0
+//    val label = values(3) match {
+//      case "seetel" => 1.0
+//      case "message" => 1.0
+//      case "apply" => 1.0
+//      case "1" => 1.0
+//      case "0" => 0.0
+//      case _ => 0.0
+//    }
+//    
+//    (label, features)
+//  }
   
-  def position(values: Array[String]) = 
-  {
-    Position(infoid = values(2),
-						 scate1 = values(6),
-						 scate2 = values(7),
-						 scate3 = values(8),
-						 title = values(9),
-						 userid = values(5),
-						 local = values(10),
-						 salary = values(11),
-						 education = values(12),
-						 experience = values(13),
-						 trade = values(14),
-						 enttype = values(15),
-						 fresh = values(17),
-						 fuli = values(16),
-						 additional = values(18)
-						 )
-  }
+//  def position(values: Array[String]) = 
+//  {
+//    Position(infoid = values(2),
+//						 scate1 = values(6),
+//						 scate2 = values(7),
+//						 scate3 = values(8),
+//						 title = values(9),
+//						 userid = values(5),
+//						 local = values(10),
+//						 salary = values(11),
+//						 education = values(12),
+//						 experience = values(13),
+//						 trade = values(14),
+//						 enttype = values(15),
+//						 fresh = values(17),
+//						 fuli = values(16),
+//						 highlights = "",
+//						 additional = values(18)
+//						 )
+//  }
   
   def main(args: Array[String]): Unit = 
   {

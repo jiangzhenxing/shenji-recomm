@@ -34,19 +34,53 @@ case class Enterprise( val id: String,		    // 企业ID
 											 val en_type: String,		// 企业性质，1476:私营 1477:国有 1478:股份制 1479:外商独资/办事处 1480:中外合资/合作 1481:上市公司 1482:事业单位 1483:政府机关 1484:非营利机构 1485:个人企业
 											 val category: String,	// 企业业务类型
 											 val fuli: String,		  // 企业福利（固定，用于用户勾选），1:五险一金,8:包住,10:包吃,9:年底双薪,6:周末双休,5:交通补助,7:加班补助,2:餐补,3:话补,4:房补
-											 val addfuli: String,		// 企业福利（不固定，用户自己添加） 
-											 val dt: String		      // 分区字段
-) extends Serializable
+											 val addfuli: String	// 企业福利（不固定，用户自己添加） 
+                      ) extends Serializable
 {
-  
+  def sizeOneHot: Array[Double] = 
+  {
+    Array("1741","1742","1743","1474","1475").map(value => if (size == value) 1d else 0d)
+  }
 }
-
 /**
  * @author jiangzx
  */
-object Enterprise {
-  def apply() =
+object Enterprise 
+{
+  val none = Enterprise("-", "-", "-", "-", "-","-", "-", "-", "-", "-","-", "-", "-", "-", "-","-", "-", "-", "-", "-","-")
+  
+  def apply(line: String): Enterprise =
   {
-    
+    val values = line.split("\001")
+    apply(values)
+  }
+  
+  def apply(values: Array[String]): Enterprise =
+  {
+    if (values.length < 21)
+      none
+    else 
+      Enterprise( id = values(0),		    // 企业ID
+  								adminid = values(1),		// 企业管理员用户ID
+  								name = values(2),		  // 企业名
+  								address = "", // values(3),		// 企业地址
+  								capitalregistered = values(4),	// 注册资金
+  								enterprisetype = values(5),		// 企业类型
+  								businessfield = values(6),		  // 企业经营范围（尽量使用trade）
+  								size = values(7),		  // 企业规模，1741：1-49人 1742:50-99人 1743:100-499人 1474:500-999人 1475：1000人以上
+  								cityid = values(8),		// 城市ID，归属地域，可与hdp_58_common_defaultdb.ds_dict_cmc_local关联
+  								homepage = "", // values(9),		// 企业主页
+  								logo = "", // values(10),		    // 企业logo位置
+  								introduction = "", // values(11),	// 企业介绍
+  								authstate = values(12),		  // 验证状态：0待审核 1审核通过 2 审核拒绝
+  								updatedate = values(13),		// 最后更新时间戳
+  								createdate = values(14),		// 创建时间戳
+  								area = values(15),		// 区域商圈
+  								trade = values(16),		// 所属行业
+  								en_type = values(17),		// 企业性质，1476:私营 1477:国有 1478:股份制 1479:外商独资/办事处 1480:中外合资/合作 1481:上市公司 1482:事业单位 1483:政府机关 1484:非营利机构 1485:个人企业
+  								category = values(18),	// 企业业务类型
+  								fuli = values(19),		  // 企业福利（固定，用于用户勾选），1:五险一金,8:包住,10:包吃,9:年底双薪,6:周末双休,5:交通补助,7:加班补助,2:餐补,3:话补,4:房补
+  								addfuli = "" // values(20)	// 企业福利（不固定，用户自己添加） 
+  								)
   }
 }

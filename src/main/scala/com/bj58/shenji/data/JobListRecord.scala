@@ -31,9 +31,6 @@ class JobListRecord(val cookieid: String,   // 用户CookieID
                    val clicktag: String,   // 点击标示，点击为1，未点击为0
                    val clicktime: String  // 点击行为时间戳
                    ) extends Serializable
-{
-  
-}
 
 object JobListRecord
 {

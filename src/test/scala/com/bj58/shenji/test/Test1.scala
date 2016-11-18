@@ -2,6 +2,8 @@ package com.bj58.shenji.test
 
 import com.bj58.shenji.data._
 import scala.collection.mutable._
+import scala.util.matching.Regex
+import java.util.ArrayList
 
 object Test1 {
   def main(args: Array[String]): Unit = {
@@ -67,7 +69,35 @@ object Test1 {
     val arr = Range(0,108).toArray
     val size = 10
     
-    Range(0, arr.size, size).map(begin => arr.slice(begin, begin + size)).foreach(a => println(a.mkString(",")))
+//    Range(0, arr.size, size).map(begin => arr.slice(begin, begin + size)).foreach(a => println(a.mkString(",")))
+//    println(None.getOrElse(null))
     
+//    val x = Option(null)
+//    println(x)
+//    x match {
+//      case Some(y) => println(y) 
+//      case None => println("x is none")
+//    }
+    
+//    println(x.get)
+//    val s: Some[String] = Some("")
+//    println(Option())
+    
+//    val re = """六险|6险|商业险""".r
+//    val s = "xxxx（商业)"
+//    println(re.findFirstIn(s) != None)
+//    println(re.pattern.matcher(s).matches())
+    
+    val nums: List[Int] = List(1, 2, 3, 4)
+    nums.+:(111)
+    println(nums)
+    val m = scala.collection.mutable.ArraySeq(1,2,3)
+    
+    m.++:(Seq(4,5,6))
+    
+    println(m)
+    
+    val s = Scores("0-GprNdAug7J01Ijna_QrZF2pyIlEE	nWTLnWD1P1ckn1mYrjn	0.5894009880875511	0.7058823529411765	0	0")
+    println(s.features.mkString(","))
   }
 }
