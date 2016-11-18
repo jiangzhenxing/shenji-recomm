@@ -63,8 +63,8 @@ case class Position( infoid: String,		// 职位ID
     val price = if (priceRE.findFirstIn(highlights) != None) 1d else 0d // 是否有奖金或年终奖
     val guquan = if (guquanRE.findFirstIn(highlights) != None) 1d else 0d // 是否有股权
     val lvyou = if (lvyouRE.findFirstIn(highlights) != None) 1d else 0d // 是否有旅游
-    
-    Array[Double](fresh, sixInsurance, gift, price, guquan, lvyou) ++: enterprise.sizeOneHot ++: localOneHot ++: jobcateOneHot ++: salaryOneHot ++: educationOneHot ++: experienceOneHot ++: fuliFeature ++: additionalFeature ++: enttypeOneHot ++: traidOneHot
+                                                                // ++: enterprise.sizeOneHot 
+    Array[Double](fresh, sixInsurance, gift, price, guquan, lvyou) ++: localOneHot ++: jobcateOneHot ++: salaryOneHot ++: educationOneHot ++: experienceOneHot ++: fuliFeature ++: additionalFeature ++: enttypeOneHot ++: traidOneHot
   }
   
   /**

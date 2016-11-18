@@ -218,6 +218,12 @@ object LRModel extends Serializable
                                                                val enterprice = Enterprise(values.slice(28, 49))
                                                                position.enterprise = enterprice
                                                                (action, position) }
+//                                                        .cache()
+                                                        
+//                              val notclick = rawdatas.filter(_._1 == "0").map { case (action, position) => (position.infoid, (action, position)) }
+//                              val clicks = rawdatas.filter(_._1 != "0").map { case (action, position) => (position.infoid, (action, position)) }
+                              
+//                              val cleandatas = notclick.subtractByKey(clicks).union(clicks).map(_._2)
                               
                               val actionCount = rawdatas.map { case (action, position) => (action, 1) }.reduceByKey(_ + _).collectAsMap
                               val jobcates = userJobcates.getOrElse(cookieid, Array())
@@ -227,7 +233,8 @@ object LRModel extends Serializable
                               val bjobcates = sc.broadcast(jobcates)
                               val blocals = sc.broadcast(locals)
                               
-                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, bactionCount.value) }.cache // .sortBy(_(4).toLong)
+                              val datas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, bactionCount.value) }
+                                                  .cache // .sortBy(_(4).toLong)
                               try {
                                 LogisticRegressionWithSGD.train(datas, 250, 2)
                                                          .save(sc, lroutput + "/" + cookieid)
