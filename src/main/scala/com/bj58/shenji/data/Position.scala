@@ -38,11 +38,16 @@ case class Position( infoid: String,		// 职位ID
 										 var enterprise: Enterprise = null
                   )  extends Serializable
 {
-  val sixInsuranceRE = """六险|6险|六金|6金|商业险|商业保险|补充医疗|商业医疗|意外险""".r
-  val giftRE = """礼物|福利|节""".r
-  val priceRE = """年终奖|奖金""".r
+  val sixInsuranceRE = """六险|6险|六金|6金|商业险|商业保险|补充医疗|商业医疗|意外险""".r  // 是否有补充商业险
+  val baoxianRE = """险|社保""".r       // 是否有保险
+  val giftRE = """礼物|福利|节""".r    // 是否有节日/礼品
+  val priceRE = """年终奖|奖金|提成|分红""".r
   val guquanRE = """股权""".r
   val lvyouRE = """旅游""".r
+  val nianjiaRE = """年假""".r
+  val bancheRE = """班车|接送""".r
+  val peixunRE = """培训""".r
+  val bianliRE = """便利""".r
   /**
    * 产生用于逻辑回归和决策树回归模型的特征
    * 企业评分，暂缺
@@ -51,20 +56,28 @@ case class Position( infoid: String,		// 职位ID
   {
     // 职位类别one-hot编码
     val jobcateOneHot = jobcates.map(cate => if (Seq(scate1,scate2,scate3).mkString(",") == cate) 1d else 0d)
+    
     // 地区one-hot编码
     val localSet = local.split(",").toSet
-    // 二级地域
-//    val localSet = local.split(",").map(cmcLocals.getOrElse(_, "-").split("\002").mkString(",")).toSet
     val localOneHot = locals.map(lc => if (localSet.contains(lc)) 1d else 0d)
+    
     // 倒班，月休4天|每月员工聚餐|旅游奖励、扩展训练| 生日礼物，三节礼物，免费旅游| |节日福利 交通超级方便 | 高奖金|+高提成 | 六险一金（商业险 | 过节费4800+高温费 | 股权激励 | 年终奖 | 5天 每月5天休息 | 社保公积金 | 三险 三金 | 补充医疗保险
-    // 是否接受应届生，企业人数，地区，工作类别，薪资one-hot, 学历要求one-hot, 工作年限one-hot，五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作，企业性质one-hot编码, 职位行业one-hot编码
     val sixInsurance = if (sixInsuranceRE.findFirstIn(highlights) != None) 1d else 0d  // 是否有补充商业险
     val gift = if (giftRE.findFirstIn(highlights) != None) 1d else 0d  // 是否有节日福利，礼品
     val price = if (priceRE.findFirstIn(highlights) != None) 1d else 0d // 是否有奖金或年终奖
     val guquan = if (guquanRE.findFirstIn(highlights) != None) 1d else 0d // 是否有股权
     val lvyou = if (lvyouRE.findFirstIn(highlights) != None) 1d else 0d // 是否有旅游
-                                                                // ++: enterprise.sizeOneHot 
-    Array[Double](fresh, sixInsurance, gift, price, guquan, lvyou) ++: enterprise.sizeOneHot ++: localOneHot ++: jobcateOneHot ++: salaryOneHot ++: educationOneHot ++: experienceOneHot ++: fuliFeature ++: additionalFeature ++: enttypeOneHot ++: traidOneHot
+    val baoxian = if (baoxianRE.findFirstIn(highlights) != None) 1d else 0d
+    val nianjia = if (nianjiaRE.findFirstIn(highlights) != None) 1d else 0d
+    val banche = if (bancheRE.findFirstIn(highlights) != None) 1d else 0d
+    val peixun = if (peixunRE.findFirstIn(highlights) != None) 1d else 0d
+    val bianli = if (bianliRE.findFirstIn(highlights) != None) 1d else 0d
+    
+    // 是否接受应届生，企业人数，地区，工作类别，薪资one-hot, 学历要求one-hot, 工作年限one-hot，五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作，企业性质one-hot编码, 职位行业one-hot编码
+    Array[Double](fresh, sixInsurance, gift, price, guquan, lvyou, baoxian, nianjia, banche, peixun, bianli) ++: 
+    enterprise.sizeOneHot ++: 
+    localOneHot ++: jobcateOneHot ++: salaryOneHot ++: educationOneHot ++: experienceOneHot ++: 
+    fuliFeature ++: additionalFeature ++: enttypeOneHot ++: traidOneHot
   }
   
   /**

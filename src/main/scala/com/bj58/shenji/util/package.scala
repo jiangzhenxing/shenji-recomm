@@ -35,7 +35,7 @@ package object util
   /**
    * 用户点击或投递过的职位类别
    */
-  def userJobcates(sc: SparkContext) = sc.textFile("/home/team016/middata/user_job_cates/")
+  def userJobcates(sc: SparkContext) = sc.textFile("/home/team016/middata/stage2/user_job_cates/")
                                          .map(_.split("\001"))
                                          .map(values => (values(0), values(1).split(";")))
                                          .collectAsMap()
@@ -43,7 +43,7 @@ package object util
   /**
    * 用户点击或投递过的地区（二级地域）
    */
-  def userLocals(sc: SparkContext) = sc.textFile("/home/team016/middata/user_locals/")
+  def userLocals(sc: SparkContext) = sc.textFile("/home/team016/middata/stage2/user_locals/")
                                        .map(_.split("\001"))
                                        .map(values => (values(0), values(1).split(";")))
                                        .collectAsMap()

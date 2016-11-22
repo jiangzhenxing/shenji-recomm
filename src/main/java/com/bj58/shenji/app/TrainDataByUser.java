@@ -94,12 +94,12 @@ public class TrainDataByUser extends Configured implements Tool
 		job.setMapOutputValueClass(Text.class);
 		job.setOutputKeyClass(NullWritable.class);
         job.setOutputValueClass(Text.class);
-		job.setNumReduceTasks(120);
+		job.setNumReduceTasks(200);
 		
 		for (int i = 1; i < 16; i++)
-			FileInputFormat.addInputPath(job, new Path("/home/team016/middata/traindata/dt=" + i));  // 11075-19881166
+			FileInputFormat.addInputPath(job, new Path("/home/team016/middata/stage2/traindata/dt=" + i));  // 23497 11075-19881166
 		
-		FileOutputFormat.setOutputPath(job, new Path("/home/team016/middata/traindatabyuser2/"));// 11176-19881166
+		FileOutputFormat.setOutputPath(job, new Path("/home/team016/middata/stage2/traindatabyuser2/"));// 23699  11176-19881166
 		
 		return job.waitForCompletion(true) ? 0 : 1;
 	}

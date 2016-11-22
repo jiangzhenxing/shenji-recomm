@@ -166,7 +166,7 @@ object Extract
             .join(positionEnterprise)
             .map { case (infoid, (detail, (position, enterprise))) => detail + sep + position + sep + enterprise } // 5 + 23 + 21
             .repartition(10)
-            .saveAsTextFile("/home/team016/middata/traindata/dt=" + dt)
+            .saveAsTextFile("/home/team016/middata/stage2/traindata/dt=" + dt)
     }
   }
   
@@ -177,7 +177,7 @@ object Extract
   {
     import com.bj58.shenji.data.Position
     val sep = "\001"
-    val traindata = sc.textFile("/home/team016/middata/traindata/*")
+    val traindata = sc.textFile("/home/team016/middata/stage2/traindata/*")
     traindata.map(_.split(sep)) // detail:0-5; position:5-29; enterprise:29-51
              .filter(_(3) != "0")
              .map { values => val p = Position(values.slice(5,29))
@@ -186,13 +186,38 @@ object Extract
              .groupBy(_._1)
              .map { case (cookieid, iter) => cookieid + sep + iter.map(_._2).mkString(";") }
              .repartition(1)
-             .saveAsTextFile("/home/team016/middata/user_job_cates/")
+             .saveAsTextFile("/home/team016/middata/stage2/user_job_cates/")
+  }
+  
+  /**
+   * 提取用户点击工作的地域
+   */
+  def extractUserLocals(sc: SparkContext) =
+  {
+    import com.bj58.shenji.data.Position
+    val sep = "\001"
+//    val locals = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/ds_dict_cmc_local")
+//                   .map(_.split(sep))
+//                   .map(values => (values(0), values(3).split("\002").slice(0, 2).mkString(",")))
+//                   .collectAsMap
+//    val blocals = sc.broadcast(locals)
+    
+    val traindata = sc.textFile("/home/team016/middata/stage2/traindata/*")
+    traindata.map(_.split(sep)) // detail:0-5; position:5-29; enterprise:29-51
+             .filter(_(3) != "0")
+             .flatMap { values => val p = Position(values.slice(5,29))
+                              p.local.split(",").map(local => (values(0), local)) }
+             .distinct
+             .groupBy(_._1)
+             .map { case (cookieid, iter) => cookieid + sep + iter.map(_._2).mkString(";") }
+             .repartition(1)
+             .saveAsTextFile("/home/team016/middata/stage2/user_locals/")
   }
   
   /**
    * 提取用户点击的二级地域
    */
-  def extractUserLocals(sc: SparkContext) =
+  def extractUserLocals2(sc: SparkContext) =
   {
     import com.bj58.shenji.data.Position
     val sep = "\001"
@@ -242,7 +267,7 @@ object Extract
   {
     val sep = "\001"
     
-    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
+    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage2/testdata/")
                      .map(_.split("\001"))
                      .map(values => (values(1).trim, values(0))) // infoid, cookieid
                      
@@ -264,8 +289,8 @@ object Extract
               
     testdata.leftOuterJoin(positionEnterprise)
             .map { case (infoid, (cookieid,pe)) => cookieid + sep + infoid + sep +  (if (pe == None) "--" else pe.get._1 + sep + pe.get._2) }
-            .repartition(1)
-            .saveAsTextFile("/home/team016/middata/testdata/") // 949258  961957 12699
+            .repartition(32)
+            .saveAsTextFile("/home/team016/middata/stage2/testdata/") // 949258  961957 12699
   }
   
   /**
@@ -409,11 +434,39 @@ object Extract
   
   def splitUser(sc: SparkContext)
   {
-    val testCookie = sc.textFile("/home/team016/middata/test_cookies").collect
-    val size = 3000
+    val testCookie = sc.textFile("/home/team016/middata/stage2/test_cookies").collect // 23497
+    val size = 2500
     Range(0, testCookie.size, size).map(begin => testCookie.slice(begin, begin + size))
                                    .zipWithIndex
-                                   .foreach { case (values, index) => sc.parallelize(values).saveAsTextFile("/home/team016/middata/test_cookies_split4/part" + index) }
+                                   .foreach { case (values, index) => sc.parallelize(values.toSeq).saveAsTextFile("/home/team016/middata/stage2/test_cookies_split10/part" + index) } // 23497
+  }
+  
+  def splitTrainData(sc: SparkContext, part: Int) =
+  {
+//    val userDataCount = sc.textFile("/home/team016/middata/stage2/userDataCount/")
+//                          .map(_.split("\t"))
+//                          .map { case Array(cookieid, count) => (cookieid, count.toInt) }
+//                          .collectAsMap
+                          
+    val cookies = sc.textFile("/home/team016/middata/stage2/test_cookies_split10/part" + part).collect()
+    
+    cookies.foreach { cookieid => 
+      val userdata = sc.textFile("/home/team016/middata/stage2/traindatabyuser/" + cookieid + "-*")
+//      val datacount = userDataCount(cookieid)
+//      val train80 = (datacount * 0.8).intValue()
+      val Array(train80, train20) = userdata.randomSplit(Array(0.8, 0.2), 97)
+      train80.saveAsTextFile("/home/team016/middata/stage2/traindatabyuser_split/train80/" + cookieid)
+      train80.saveAsTextFile("/home/team016/middata/stage2/traindatabyuser_split/train20/" + cookieid)
+    }
+  }
+  
+  def userDataCount(sc: SparkContext) = 
+  {
+    sc.textFile("/home/team016/middata/stage2/traindatabyuser/")
+      .map(line => (line.split("\001")(0), 1))
+      .reduceByKey(_ + _)
+      .map(kv => kv._1 + "\t" + kv._2)
+      .saveAsTextFile("/home/team016/middata/stage2/userDataCount")
   }
   
   /**
@@ -559,12 +612,106 @@ object Extract
     }
   }
   
+  def extracTrainScoreByUser(sc: SparkContext) =
+  {
+    // cookieid, infoid, lrscore, dtscore, svmscore, label
+    val lrdtsvmscore = sc.textFile("/home/team016/middata/stage2/train_result/lrdtsvmbyuser/all/*")
+                                .map(_.split("\t")) 
+                                .map { case Array(cookieid, infoid, lrscore, dtscore, svmscore, label) => 
+                                  (cookieid + "\t" + infoid, (lrscore, dtscore, svmscore, label))
+                                }
+                                .repartition(100)
+    val cfScores = sc.textFile("/home/team016/middata/stage2/train_result/cf/")  // 32 203 297 * 100
+                     .map(_.split("\t"))
+                     .map { case Array(cookieid, infoid, score) => (cookieid + "\t" + infoid, score) }
+                     .distinct()
+                     .repartition(100)
+    // cookieid, infoid, clickscore, label(action)
+    val clickScores = sc.textFile("/home/team016/middata/stage2/train_result/click/")
+                     .map(_.split("\t"))
+                     .map { case Array(cookieid, infoid, score, label) => (cookieid + "\t" + infoid, score) }
+                     .distinct
+                     .repartition(100)
+                     
+    lrdtsvmscore.leftOuterJoin(cfScores)
+                .map { case (cookie_info, ((lrscore, dtscore, svmscore, label), cfscore)) => 
+                        (cookie_info, (lrscore, dtscore, svmscore, if (cfscore == None) "0" else cfscore.get, label)) }
+                .leftOuterJoin(clickScores)
+                .map { case (cookie_info, ((lrscore, dtscore, svmscore, cfscore, label), clickscore)) => 
+                        Array(cookie_info, lrscore, dtscore, svmscore, cfscore, if (clickscore == None) "0" else clickscore.get, label).mkString("\t") }
+                .saveAsTextFile("/home/team016/middata/stage2/train_result/allscore2/")
+  }
+  
+  def extractTestScore(sc: SparkContext) =
+  {
+    // cookieid, infoid, score
+    val lrScores = sc.textFile("/home/team016/middata/stage2/result/lr") // 2 034 327
+                                .map(_.split("\t"))
+                                .map { case Array(cookieid, infoid, score) => 
+                                  (cookieid + "\t" + infoid, score)
+                                }
+    
+    val dtScores = sc.textFile("/home/team016/middata/stage2/result/dtpart/*") // 2034327
+                                .map(_.split("\t")) 
+                                .map { case Array(cookieid, infoid, score) => 
+                                  (cookieid + "\t" + infoid, score)
+                                }
+    
+    val svmScores = sc.textFile("/home/team016/middata/stage2/result/svm") // 2 034 327
+                                .map(_.split("\t")) 
+                                .map { case Array(cookieid, infoid, score) => 
+                                  (cookieid + "\t" + infoid, score)
+                                }
+    
+    val cfScores = sc.textFile("/home/team016/middata/stage2/result/cf/")  // 1 828 996
+                     .map(_.split("\t"))
+                     .map { case Array(cookieid, infoid, score) => (cookieid + "\t" + infoid, score) }
+    
+    // cookieid, infoid, clickscore, label(action)
+    val clickScores = sc.textFile("/home/team016/middata/stage2/result/click_evaluate/") // 2034327
+                     .map(_.split("\t"))
+                     .map { case Array(cookieid, infoid, score) => (cookieid + "\t" + infoid, score) }
+    // lrscore, dtscore, svmscore, cfscore, clickscore
+    lrScores.leftOuterJoin(dtScores)
+                .map { case (cookie_info, (lrscore, dtscore)) => 
+                        (cookie_info, lrscore + "\t" + (if (dtscore == None) "0" else dtscore.get)) }
+                .leftOuterJoin(svmScores)
+                .map { case (cookie_info, (lrdtscore, svmscore)) => 
+                        (cookie_info, (lrdtscore + "\t" + (if (svmscore == None) "0" else svmscore.get))) }
+                .leftOuterJoin(cfScores)
+                .map { case (cookie_info, (lrdtsvmscore, cfscore)) => 
+                        (cookie_info, (lrdtsvmscore + "\t" + (if (cfscore == None) "0" else cfscore.get))) }
+                .leftOuterJoin(clickScores)
+                .map { case (cookie_info, (lrdtsvmcfscore, clickscore)) => 
+                        cookie_info + "\t" + lrdtsvmcfscore + "\t" + (if (clickscore == None) "0" else clickscore.get) }
+                .repartition(10)
+                .saveAsTextFile("/home/team016/middata/stage2/result/allscore/")  // 2034327
+  }
+  
+  def splitTestData(sc: SparkContext) =
+  {
+    sc.textFile("/home/team016/middata/stage2/testdata/")
+      .map(line => (line.split("\001", 3)(0), line))
+      .partitionBy(new HashPartitioner(8))
+      .map(_._2)
+      .saveAsTextFile("/home/team016/middata/stage2/testdata8/")
+  }
+  
   /**
    * 测试数据集中的cookieid
    */
   def testCookieSet(sc: SparkContext) = 
   {
-    sc.textFile("/home/team016/middata/test_cookies").collect.toSet
+    sc.textFile("/home/team016/middata/stage2/test_cookies").collect.toSet // 23497
+  }
+  
+  
+  def extractTestCookie(sc: SparkContext) =
+  {
+    sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage2/testdata/")
+      .map(_.split("\001")(0))
+      .distinct()
+      .saveAsTextFile("/home/team016/middata/stage2/test_cookies/")
   }
   
 //  def sparkContext = new SparkContext(new SparkConf())
@@ -613,6 +760,14 @@ object Extract
       click_count_with_code(sc)
     }
     
+    if (args(0) == "extractUserLocals") {
+      extractUserLocals(sc)
+    }
+    
+    if (args(0) == "extractUserJobCates") {
+      extractUserJobCates(sc)
+    }
+    
     if (args(0) == "extractTrainData") {
       println("************** extractTrainData begin ********************")
       extractTrainData(sc)
@@ -626,6 +781,27 @@ object Extract
     if (args(0) == "extractAllScore") {
       extractAllScore(sc)
     }
+    
+    if (args(0) == "splitTrainData") {
+      splitTrainData(sc, args(1).toInt)
+    }
+    
+    if (args(0) == "extracTrainScoreByUser") {
+      extracTrainScoreByUser(sc)
+    }
+    
+    if (args(0) == "extractTestScore") {
+      extractTestScore(sc)
+    }
+    
+    if (args(0) == "splitTestData") {
+      splitTestData(sc)
+    }
+    
+    if (args(0) == "splitUser") {
+      splitUser(sc)
+    }
+    
     
     sc.stop()
   }
