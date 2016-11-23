@@ -620,10 +620,13 @@ object Evaluate
     
   }
   
+  /**
+   *  (count: 2034327, mean: -2.449442, stdev: 2.523254, max: 21.599605, min: -112.980436)
+   */
   def evaluateComprehensive(sc: SparkContext) =
   {
     // cookieid weights
-    val weightsMap = sc.textFile("/home/team016/middata/stage2/model3/comprehensive/part/*")
+    val weightsMap = sc.textFile("/home/team016/middata/stage2/model3/comprehensive_svm/part/*")
                     .map(_.split("\t"))
                     .map { case Array(cookieid, weights) => (cookieid, weights.split(",").map(_.toDouble)) }
                     .collectAsMap
@@ -636,8 +639,8 @@ object Evaluate
                             iter.map(_.split("\t"))
                                 .map { case Array(cookieid, infoid, lrscore, dtscore, svmscore, cfscore, clickscore) => 
                                             cookieid + "\t" + infoid + "\t" + 
-                                            util.logistic(util.vecdot(weightsMap.getOrElse(cookieid, Array(0,0,0,0,0)), Array(lrscore, dtscore, svmscore, cfscore, clickscore).map(_.toDouble))) })
-            .saveAsTextFile("/home/team016/middata/stage2/result/comprehensive")
+                                            util.vecdot(weightsMap.getOrElse(cookieid, Array(0,0,0,0,0)), Array(lrscore, dtscore, svmscore, cfscore, clickscore).map(_.toDouble)) })
+            .saveAsTextFile("/home/team016/middata/stage2/result/comprehensive_svm")
   }
   
   def evaluateLRClick(sc: SparkContext) =

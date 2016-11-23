@@ -20,7 +20,7 @@ import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.netlib.util.intW;
 
-public class TrainDataByUser extends Configured implements Tool 
+public class ClickEvalByUser extends Configured implements Tool 
 {
 	public static class TrainDataByUserMapper extends Mapper<LongWritable,Text,Text,Text> 
 	{
@@ -29,8 +29,8 @@ public class TrainDataByUser extends Configured implements Tool
 		@Override
 		public void map(LongWritable inKey, Text inValue, Context context) throws IOException, InterruptedException
 		{
-			String record = inValue.toString();
-			outKey.set(record.substring(0, record.indexOf("\001")));
+			String record = inValue.toString();	// cookie_info, lrscore, dtscore, svmscore, cfscore, clickscore, label
+			outKey.set(record.substring(0, record.indexOf("\t")));
 			context.write(outKey, inValue);
 		}
 	}
@@ -85,7 +85,7 @@ public class TrainDataByUser extends Configured implements Tool
 		
 		job.setJobName(getClass().getName());
 		
-		job.setJarByClass(TrainDataByUser.class);
+		job.setJarByClass(ClickEvalByUser.class);
 		
 		job.setMapperClass(TrainDataByUserMapper.class);
 		job.setReducerClass(TrainDataByUserMapperReducer.class);
@@ -96,17 +96,16 @@ public class TrainDataByUser extends Configured implements Tool
         job.setOutputValueClass(Text.class);
 		job.setNumReduceTasks(200);
 		
-		for (int i = 1; i < 16; i++)
-			FileInputFormat.addInputPath(job, new Path("/home/team016/middata/stage2/traindata/dt=" + i));  // 23497 11075-19881166
+		FileInputFormat.addInputPath(job, new Path("/home/team016/middata/stage2/train_result/allscore2/"));  // 23497 11075-19881166
 		
-		FileOutputFormat.setOutputPath(job, new Path("/home/team016/middata/stage2/traindatabyuser/"));// 23699  11176-19881166
+		FileOutputFormat.setOutputPath(job, new Path("/home/team016/middata/stage2/train_result/allscorebyuser/"));// 23699  11176-19881166
 		
 		return job.waitForCompletion(true) ? 0 : 1;
 	}
 	
 	public static void main(String[] args) throws Exception
 	{
-		int status = ToolRunner.run(new TrainDataByUser(), args);
+		int status = ToolRunner.run(new ClickEvalByUser(), args);
 		System.exit(status);
 	}
 }

@@ -2,12 +2,15 @@ package com.bj58.shenji.app;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.mapred.lib.MultipleTextOutputFormat;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
@@ -18,9 +21,8 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
-import org.netlib.util.intW;
 
-public class TrainDataByUser extends Configured implements Tool 
+public class SplitTrainDataByUser extends Configured implements Tool 
 {
 	public static class TrainDataByUserMapper extends Mapper<LongWritable,Text,Text,Text> 
 	{
@@ -38,6 +40,7 @@ public class TrainDataByUser extends Configured implements Tool
 	public static class TrainDataByUserMapperReducer extends Reducer<Text, Text, NullWritable, Text>
 	{
 		private MultipleOutputs<NullWritable, Text> multipleOutputs;
+		private Text out = new Text();
 		
 		@Override
 		protected void setup(Context context) throws IOException ,InterruptedException 
@@ -49,9 +52,30 @@ public class TrainDataByUser extends Configured implements Tool
 		public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException
 		{
 			String cookieid = key.toString();
+			List<String> records = new ArrayList<String>();
 			
+			// r.cookieid, r.userid, r.infoid, r.clicktag, r.clicktime
 			for (Text value : values) {
-				multipleOutputs.write(NullWritable.get(), value, cookieid);
+				records.add(value.toString());
+			}
+			
+			Collections.sort(records, new Comparator<String>() {
+				@Override
+				public int compare(String s1, String s2) {
+					return (int) (Long.parseLong(s1.split("\001", 10)[4]) - Long.parseLong(s2.split("\001", 10)[4]));
+				}
+			});
+			
+			int train = (int) (records.size() * 0.8);
+			
+			for (int i = 0; i < train; i++) {
+				out.set(records.get(i));
+				multipleOutputs.write(NullWritable.get(), out, "train80/" + cookieid);
+			}
+			
+			for (int i = train; i < records.size(); i++) {
+				out.set(records.get(i));
+				multipleOutputs.write(NullWritable.get(), out, "train20/" + cookieid);
 			}
 		}
 		
@@ -80,12 +104,14 @@ public class TrainDataByUser extends Configured implements Tool
 	public int run(String[] args) throws Exception
 	{
 		Configuration config = getConf();
+		config.set("mapreduce.reduce.java.opts", "-Xmx8000m");
+		config.set("mapreduce.reduce.memory.mb", "8000m");
 		
 		Job job = Job.getInstance(config);
 		
 		job.setJobName(getClass().getName());
 		
-		job.setJarByClass(TrainDataByUser.class);
+		job.setJarByClass(SplitTrainDataByUser.class);
 		
 		job.setMapperClass(TrainDataByUserMapper.class);
 		job.setReducerClass(TrainDataByUserMapperReducer.class);
@@ -94,19 +120,18 @@ public class TrainDataByUser extends Configured implements Tool
 		job.setMapOutputValueClass(Text.class);
 		job.setOutputKeyClass(NullWritable.class);
         job.setOutputValueClass(Text.class);
-		job.setNumReduceTasks(200);
+		job.setNumReduceTasks(50);
 		
-		for (int i = 1; i < 16; i++)
-			FileInputFormat.addInputPath(job, new Path("/home/team016/middata/stage2/traindata/dt=" + i));  // 23497 11075-19881166
+		FileInputFormat.addInputPath(job, new Path("/home/team016/middata/stage2/traindatabyuser/"));  // 23497 11075-19881166
 		
-		FileOutputFormat.setOutputPath(job, new Path("/home/team016/middata/stage2/traindatabyuser/"));// 23699  11176-19881166
+		FileOutputFormat.setOutputPath(job, new Path("/home/team016/middata/stage2/traindatabyuser_split/"));// 23699  11176-19881166
 		
 		return job.waitForCompletion(true) ? 0 : 1;
 	}
 	
 	public static void main(String[] args) throws Exception
 	{
-		int status = ToolRunner.run(new TrainDataByUser(), args);
+		int status = ToolRunner.run(new SplitTrainDataByUser(), args);
 		System.exit(status);
 	}
 }
