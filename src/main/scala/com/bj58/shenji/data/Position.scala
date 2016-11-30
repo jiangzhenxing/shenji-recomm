@@ -75,7 +75,7 @@ case class Position( infoid: String,		// 职位ID
     
     // 是否接受应届生，企业人数，地区，工作类别，薪资one-hot, 学历要求one-hot, 工作年限one-hot，五险一金，包住，包吃，年底双薪,周末双休,交通补助,加班补助,餐补,话补,房补，会有加班，需要出差，需要管理团队，异地派遣工作，企业性质one-hot编码, 职位行业one-hot编码
     Array[Double](fresh, sixInsurance, gift, price, guquan, lvyou, baoxian, nianjia, banche, peixun, bianli) ++: 
-    enterprise.sizeOneHot ++: 
+//    enterprise.sizeOneHot ++: 
     localOneHot ++: jobcateOneHot ++: salaryOneHot ++: educationOneHot ++: experienceOneHot ++: 
     fuliFeature ++: additionalFeature ++: enttypeOneHot ++: traidOneHot
   }

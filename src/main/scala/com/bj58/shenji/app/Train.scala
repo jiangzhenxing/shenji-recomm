@@ -18,6 +18,7 @@ object Train
     conf.set("spark.port.maxRetries","100")  // --conf spark.ui.port=424$dateBegin \
     
     val sc = new SparkContext(conf)
+    sc.setLogLevel("WARN")
     
     if (args(0) == "train")
       LRModel.trainAll(sc)

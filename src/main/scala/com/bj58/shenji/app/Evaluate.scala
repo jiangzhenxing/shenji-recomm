@@ -228,21 +228,27 @@ object Evaluate
 //    val sep = "\001"
     var preCookieid = ""
     var model: LogisticRegressionModel = null
-    
+     
     val test_data = sc.textFile("/home/team016/middata/stage2/testdata/") // 2034327
     val userJobCates = util.userJobcates(sc)
     val userLocals = util.userLocals(sc)
     val cmcLocal = Map[String, String]() // util.cmcLocal(sc)
-                           
+    var numRecord = 0
+    var numUser = 0
+    
     val scores = test_data.repartition(1000)
                           .sortBy(_.split("\001", 2)(0))
                           .toLocalIterator
                           .map { record =>
+                            numRecord += 1
+                            println("eval " + numRecord)
                             val values = record.split("\001")
                             val cookieid = values(0)
                             val infoid = values(1)
                             if (cookieid != preCookieid) {
-                              model = LogisticRegressionModel.load(sc, "/home/team016/middata/stage2/model3/lr/all/" + cookieid)
+                              numUser += 1
+                              println("load " + numUser + " :" + cookieid)
+                              model = LogisticRegressionModel.load(sc, "/home/team016/middata/stage2/model/lr_raw/all/" + cookieid)
                               preCookieid = cookieid
                             }
                             var score = 0.5
@@ -258,7 +264,7 @@ object Evaluate
                           
         
     sc.parallelize(scores.toSeq, 1)
-      .saveAsTextFile("/home/team016/middata/stage2/result/lr/")
+      .saveAsTextFile("/home/team016/middata/stage2/result/lr2/")
   }
   
   
@@ -672,7 +678,7 @@ object Evaluate
     val sep = "\t"
 
     // (count: 949258, mean: 0.420419, stdev: 0.226644, max: 0.999548, min: 0.000039)
-    val lrscore = sc.textFile("/home/team016/middata/stage2/result/lr") // 961957 - 12699 = 949258
+    val lrscore = sc.textFile("/home/team016/middata/stage2/result/lr2") // 961957 - 12699 = 949258
                     .map(_.split(sep))
 //                    .filter(_(1) != "--")
                     .map { case Array(cookieid,infoid,score) => (cookieid + sep + infoid, score) }
@@ -694,27 +700,32 @@ object Evaluate
                     .map(_.split(sep))
                     .map { case Array(cookieid,infoid,score) => (cookieid + sep + infoid, score) }
     
+    val lrclscore = sc.textFile("/home/team016/middata/stage2/result/lr_cl/") // 961957 - 12699 = 949258
+                    .map(_.split(sep))
+                    .filter(_(1) != "--")
+                    .map { case Array(cookieid,infoid,score) => (cookieid + sep + infoid, score) } 
+    
     lrscore.leftOuterJoin(dtscore)
            .map { case (cookie_info, (lr_score, op_cl_score)) => 
                      val cf_score = if (op_cl_score == None) 0d else op_cl_score.get.toDouble
                      cookie_info + sep + Range(1, 10).map(i => lr_score.toDouble + cf_score * i / 10).mkString(sep) }
            .repartition(1)
            .saveAsTextFile("/home/team016/middata/stage2/result5/lr_dt")
-           
+    
     lrscore.leftOuterJoin(clickscore)
            .map { case (cookie_info, (lr_score, op_cl_score)) => 
                      val cl_score = if (op_cl_score == None) 0d else op_cl_score.get.toDouble
-                     cookie_info + sep + Range(1, 2).map(i => lr_score.toDouble + (if (cl_score < 1) 0 else math.log(cl_score)) * i / 10).mkString(sep) }
-           .repartition(1)
+                     cookie_info + sep + Range(1, 2).map(i => lr_score.toDouble + (if (cl_score < 1) 0 else math.log(cl_score)) * i / 100).mkString(sep) }
+           .repartition(10)
 //           .toLocalIterator
 //           .foreach(line => writer.write(line + "\n"))
-           .saveAsTextFile("/home/team016/middata/stage2/result/lr_cl2")
+           .saveAsTextFile("/home/team016/middata/stage2/result/lr_cl")
            
     lrscore.leftOuterJoin(cfscore)
            .map { case (cookie_info, (lr_score, op_cf_score)) => 
                      val cf_score = if (op_cf_score == None) 0d else op_cf_score.get.toDouble
-                     cookie_info + sep + Range(1, 21).map(i => lr_score.toDouble + cf_score * i / 10).mkString(sep) }
-           .repartition(1)
+                     cookie_info + sep + Range(1, 2).map(i => lr_score.toDouble + cf_score * i / 50).mkString(sep) }
+           .repartition(10)
            .saveAsTextFile("/home/team016/middata/stage2/result/lr_cf")
            
     lrscore.join(dtscore)
@@ -722,7 +733,7 @@ object Evaluate
            .join(clickscore)
            .map { case (cookie_info, (((lr_score, dtscore), cf_score), click_score)) => 
                      cookie_info + sep + Range(1, 21).map(i => lr_score.toDouble + dtscore.toDouble * i / 10).mkString(sep) }
-           .repartition(1)
+           .repartition(10)
            .saveAsTextFile("/home/team016/middata/stage2/result5/lrdtcfcl")
            
     Range(1,10).foreach{
@@ -766,6 +777,8 @@ object Evaluate
   {
     val conf = new SparkConf().setAppName("Evaluate " + args(0).toUpperCase())
     val sc = new SparkContext(conf)
+    sc.setLogLevel("WARN")
+    
     val sep = "\t"
     
     if (args(0).toUpperCase() == "CF")

@@ -88,16 +88,20 @@ object Test1 {
 //    println(re.findFirstIn(s) != None)
 //    println(re.pattern.matcher(s).matches())
     
-    val nums: List[Int] = List(1, 2, 3, 4)
-    nums.+:(111)
-    println(nums)
-    val m = scala.collection.mutable.ArraySeq(1,2,3)
+//    val nums: List[Int] = List(1, 2, 3, 4)
+//    nums.+:(111)
+//    println(nums)
+//    val m = scala.collection.mutable.ArraySeq(1,2,3)
+//    
+//    m.++:(Seq(4,5,6))
+//    
+//    println(m)
+//    
+//    val s = Scores("0-GprNdAug7J01Ijna_QrZF2pyIlEE	nWTLnWD1P1ckn1mYrjn	0.5894009880875511	0.7058823529411765	0	0")
+//    println(s.features.mkString(","))
     
-    m.++:(Seq(4,5,6))
+    val s = "asdfgh"
+    println(s.contains('f'))
     
-    println(m)
-    
-    val s = Scores("0-GprNdAug7J01Ijna_QrZF2pyIlEE	nWTLnWD1P1ckn1mYrjn	0.5894009880875511	0.7058823529411765	0	0")
-    println(s.features.mkString(","))
   }
 }

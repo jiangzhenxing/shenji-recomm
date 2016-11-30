@@ -31,8 +31,9 @@ public class SplitTrainDataByUser extends Configured implements Tool
 		@Override
 		public void map(LongWritable inKey, Text inValue, Context context) throws IOException, InterruptedException
 		{
-			String record = inValue.toString();
-			outKey.set(record.substring(0, record.indexOf("\001")));
+			// r.cookieid, r.userid, r.infoid, r.clicktag, r.clicktime, position, enterprise
+			String[] values = inValue.toString().split("\001", 10);
+			outKey.set(values[0]);
 			context.write(outKey, inValue);
 		}
 	}
@@ -56,7 +57,7 @@ public class SplitTrainDataByUser extends Configured implements Tool
 			
 			// r.cookieid, r.userid, r.infoid, r.clicktag, r.clicktime
 			for (Text value : values) {
-				records.add(value.toString());
+				multipleOutputs.write(NullWritable.get(), out, cookieid);
 			}
 			
 			Collections.sort(records, new Comparator<String>() {

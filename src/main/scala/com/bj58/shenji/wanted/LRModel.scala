@@ -26,6 +26,7 @@ import org.jboss.netty.util.internal.ConcurrentHashMap
 import java.util.Map.Entry
 import org.apache.spark.mllib.classification.SVMWithSGD
 import java.util.Date
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 逻辑回归模型
@@ -37,14 +38,14 @@ object LRModel extends Serializable
   def trainAll(sc: SparkContext) =
   {
     // /home/team016/middata/model5/
-    train2(sc, "/home/team016/middata/stage2/test_cookies",
-              "/home/team016/middata/stage2/model/lr",
-              "/home/team016/middata/stage2/model/svm",
-              "/home/team016/middata/stage2/model/dt")
+//    train2(sc, "/home/team016/middata/stage2/test_cookies",
+//              "/home/team016/middata/stage2/model/lr",
+//              "/home/team016/middata/stage2/model/svm",
+//              "/home/team016/middata/stage2/model/dt")
 //    trainAndEval(sc, "/home/team016/middata/test_cookies")
-//    trainConcurrent(sc, "/home/team016/middata/test_cookies", 
-//                        "/home/team016/middata/model9/lr",
-//                        "/home/team016/middata/model9/dt")
+    trainConcurrent(sc, "/home/team016/middata/stage2/test_cookies", 
+                        "/home/team016/middata/stage2/model/lr_raw",
+                        "/home/team016/middata/stage2/model/dt")
   }
   
   def trainPart(sc: SparkContext, part: Int) =
@@ -53,7 +54,7 @@ object LRModel extends Serializable
 //                        "/home/team016/middata/model3/lr/part" + part,
 //                        "/home/team016/middata/model3/dt/part" + part)
     train2(sc, "/home/team016/middata/stage2/test_cookies_split10/part" + part,
-              "/home/team016/middata/stage2/model/lr/part" + part,
+              "/home/team016/middata/stage2/model/lr_clean/part" + part,
               "/home/team016/middata/stage2/model/svm/part" + part,
               "/home/team016/middata/stage2/model/dt/part" + part)
   }
@@ -69,9 +70,10 @@ object LRModel extends Serializable
       // (cookieid,0),(userid,1),(infoid,2),(clicktag,3),(clicktime,4),(userid,5),(scate1,6),(scate2,7),(scate3,8),(title,9),(local,10),
       // (salary,11),(education,12),(experience,13),(trade,14),(enttype,15),(fuli,16),(fresh,17),(additional,18)
       val accum = sc.accumulator(0, "SUCESS_COUNT")
-
+      var n = 0
       testCookies.map { cookieid =>
-        println(cookieid)
+        n += 1
+        println(cookieid + ": " + n + "********************************")
         try {
           val train_data = sc.textFile("/home/team016/middata/stage2/traindatabyuser/" + cookieid + "-*")
           /*
@@ -85,22 +87,27 @@ object LRModel extends Serializable
                                            val enterprice = Enterprise(values.slice(28, 49))
                                            position.enterprise = enterprice
                                            (action, position) }
-//                                  .cache()
-                                                        
-//        val notclick = rawdatas.filter(_._1 == "0").map { case (action, position) => (position.infoid, (action, position)) }
-//        val clicks = rawdatas.filter(_._1 != "0").map { case (action, position) => (position.infoid, (action, position)) }
+                                   .cache()
+//          println("rawdatas count is " + rawdatas.count())
+          val notclick = rawdatas.filter(_._1 == "0").map { case (action, position) => (position.infoid, (action, position)) }
+          val clicks = rawdatas.filter(_._1 != "0").map { case (action, position) => (position.infoid, (action, position)) }
           
-//        val cleandatas = notclick.subtractByKey(clicks).union(clicks).map(_._2)
+          val cleandatas = notclick.subtractByKey(clicks).union(clicks).map(_._2)
+          println("cleandatas count is " + cleandatas.count())
           
-          val actionCount = rawdatas.map { case (action, position) => (action, 1) }.reduceByKey(_ + _).collectAsMap
+          val actionCount = cleandatas.map { case (action, position) => (action, 1) }.reduceByKey(_ + _).collectAsMap
           val bjobcates = sc.broadcast(userJobcates.getOrElse(cookieid, Array()))
           val blocals = sc.broadcast(locals.getOrElse(cookieid, Array()))
           
           try {
             val needBase = needBaseCount(actionCount)
-            val lrdatas = rawdatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, needBase) }.cache // .sortBy(_(4).toLong)
+            println("needBase is " + needBase)
+            val lrdatas = cleandatas.flatMap { case (action, position) => labeledPoints(action, position, blocals.value, bjobcates.value,bcmcLocal.value, needBase) }.cache // .sortBy(_(4).toLong)
+            rawdatas.unpersist(false)
+            println(lrdatas.count())
+            
             LogisticRegressionWithSGD.train(input=lrdatas, numIterations=250, stepSize=2)
-              .save(sc, lroutput + "/" + cookieid)
+                                     .save(sc, lroutput + "/" + cookieid)
               
 //            SVMWithSGD.train(input=lrdatas, numIterations=200)
 //              .save(sc, svmoutput + "/" + cookieid)
@@ -140,11 +147,14 @@ object LRModel extends Serializable
     
 //    val lrscores = new ConcurrentHashMap[String,Array[(String,Double)]]()
 //    val dtscores = new ConcurrentHashMap[String,Array[(String,Double)]]()
+    val count = new AtomicInteger(0)
+    var complete = 0
     
     testCookies.map { cookieid =>
       executor.submit(new Callable[String]() with Serializable {
                           def call = {
-                            println(cookieid)
+                            val num = count.incrementAndGet()
+                            println("train " + cookieid + " 第 " + num + " ****************************")
                             try {
                               val train_data = sc.textFile("/home/team016/middata/stage2/traindatabyuser/" + cookieid + "-*")
                               /*
@@ -181,9 +191,9 @@ object LRModel extends Serializable
                                                          .save(sc, lroutput + "/" + cookieid)
 //                                val lrscore = testData(cookieid).map(infoposition => (infoposition._1, util.logistic(util.vecdot(lrmodel.weights.toArray,infoposition._2))))
 //                                lrscores.put(cookieid, lrscore)
-                                //                                  
-                                DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity = "variance", maxDepth = 10, maxBins = 36)
-                                            .save(sc, dtoutput + "/" + cookieid) // 9:0.6448457311761356
+                                // 
+//                                DecisionTree.trainRegressor(datas, Map[Int, Int](), impurity = "variance", maxDepth = 10, maxBins = 36)
+//                                            .save(sc, dtoutput + "/" + cookieid) // 9:0.6448457311761356
 //                                val dtscore = testData(cookieid).map(position => (position._1, dtmodel.predict(Vectors.dense(position._2))))
 //                                dtscores.put(cookieid, dtscore)
                                 cookieid + " complete!"
@@ -197,7 +207,7 @@ object LRModel extends Serializable
                             }
                           }
                     })
-    }.foreach { f => println(f.get) }
+    }.foreach { f => { complete += 1; println("complete " + f.get + " 第 " + complete + " ##################") } }
     executor.shutdown()
     
 //    sc.parallelize(lrscores.entrySet().toArray.toSeq)

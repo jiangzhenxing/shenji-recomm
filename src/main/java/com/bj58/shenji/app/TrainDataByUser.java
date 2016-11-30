@@ -13,12 +13,14 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.WritableComparable;
+import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
-import org.netlib.util.intW;
 
 public class TrainDataByUser extends Configured implements Tool 
 {
@@ -29,8 +31,9 @@ public class TrainDataByUser extends Configured implements Tool
 		@Override
 		public void map(LongWritable inKey, Text inValue, Context context) throws IOException, InterruptedException
 		{
-			String record = inValue.toString();
-			outKey.set(record.substring(0, record.indexOf("\001")));
+			// r.cookieid, r.userid, r.infoid, r.clicktag, r.clicktime, position, enterprise
+			String[] values = inValue.toString().split("\001", 10);
+			outKey.set(values[0] + ":" + values[4]);
 			context.write(outKey, inValue);
 		}
 	}
@@ -48,7 +51,7 @@ public class TrainDataByUser extends Configured implements Tool
 		@Override
 		public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException
 		{
-			String cookieid = key.toString();
+			String cookieid = key.toString().split(":")[0];
 			
 			for (Text value : values) {
 				multipleOutputs.write(NullWritable.get(), value, cookieid);
@@ -61,6 +64,45 @@ public class TrainDataByUser extends Configured implements Tool
 			multipleOutputs.close();
 		}
 		
+	}
+	
+	/**
+	 * 分区函数，按Cookieid分区
+	 * @author jiangzhenxing
+	 * @version 2015年8月5日
+	 */
+	public static class CookieidPartitioner extends Partitioner<Text, Text>
+	{
+		@Override
+		public int getPartition(Text key, Text value, int numPartitions) {
+			return Math.abs(key.toString().split(":")[0].hashCode()) % numPartitions;
+		}
+	}
+	
+	/**
+	 * 分组函数，按Cookieid分组
+	 * @author jiangzhenxing
+	 * @version 2015年8月5日
+	 */
+	public static class CookieidGroupComparator extends WritableComparator
+	{
+		private static final Text.Comparator COMPARATOR = new Text.Comparator();
+		
+		public CookieidGroupComparator() {
+			super(Text.class);
+		}
+		
+		@Override
+		public int compare(WritableComparable o1, WritableComparable o2) 
+		{
+			if (o1 instanceof Text && o2 instanceof Text) {
+				String k1 = o1.toString();
+				String k2 = o2.toString();
+				
+				return ((Text) o1).compareTo(((Text) o2));
+			}
+			return super.compare(o1, o2);
+		}
 	}
 	
 	/*
@@ -94,6 +136,7 @@ public class TrainDataByUser extends Configured implements Tool
 		job.setMapOutputValueClass(Text.class);
 		job.setOutputKeyClass(NullWritable.class);
         job.setOutputValueClass(Text.class);
+        job.setPartitionerClass(CookieidPartitioner.class);
 		job.setNumReduceTasks(200);
 		
 		for (int i = 1; i < 16; i++)
