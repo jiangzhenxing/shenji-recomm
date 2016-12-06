@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger
 object LRModel extends Serializable
 {
   val logger = LoggerFactory.getLogger("LRModel")
-   
+  
   def trainAll(sc: SparkContext) =
   {
     // /home/team016/middata/model5/

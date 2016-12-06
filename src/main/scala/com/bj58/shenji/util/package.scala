@@ -27,11 +27,18 @@ package object util
    * cmc_local表中的数据
    * @return Map(areaid, area_full_path)
    */
-  def cmcLocal(sc: SparkContext) 
-               = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/ds_dict_cmc_local")
+  def cmcLocal(sc: SparkContext) = 
+                 sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/ds_dict_cmc_local")
                    .map(_.split("\001"))
-                   .map(values => (values(0), values(3).split("\002").slice(0, 2).mkString(",")))
+                   .map(values => (values(0), values(3).replace("\002", ",")))
                    .collectAsMap
+                   
+  def cmcCates(sc: SparkContext) = 
+                 sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/ds_dict_cmc_category")
+                   .map(_.split("\001"))
+                   .map(values => (values(0), values(5).replace("\002", ",")))
+                   .collectAsMap
+                   
   /**
    * 用户点击或投递过的职位类别
    */

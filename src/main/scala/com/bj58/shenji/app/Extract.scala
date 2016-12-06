@@ -300,17 +300,22 @@ object Extract
   {
     val sep = "\t"
     // 找到用户id
-    val listUser = (sc.textFile("/home/team016/middata/test_list_position/*")
-                     .map(_.split("\t",5))
+    val listUser = (sc.textFile("/home/team016/middata/stage2/traindatabyuser/")
+                      .repartition(100)
+                     .map(_.split("\001"))
                      .map(values => (values(1),values(0))) // userid, cookieid
-                     .distinct())
-                     
+                     .distinct()
+                     ) // /home/team016/middata/cookie_user
+//    listUser.map { case (userid, cookieid) => cookieid + "\t" + userid }
+//            .saveAsTextFile("/home/team016/middata/test_cookie_user")
+            
     val resume = (sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/resume/*")
-                      .map(p => (p.substring(0, p.indexOf("\001")), p))) // userid, resume
+                    .repartition(100)
+                      .map(p => (p.split("\001", 3)(1), p))) // userid, resume
     listUser.join(resume)
             .mapValues { case (cookieid, resume) => cookieid + sep + resume }
-            .map(_._1)
-            .saveAsTextFile("/home/team016/middata/test_user_resume")
+            .map(_._2)
+            .saveAsTextFile("/home/team016/middata/stage2/test_user_resume")
 //    testdata.join(resume)
 //            .map { case (infoid, (cookieid,position)) => (cookieid, Position(position)) }
 //            .map { case (cookieid, p) =>  Array(cookieid,p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep) }

@@ -443,6 +443,42 @@ object Evaluate
       .saveAsTextFile("/home/team016/middata/stage2/result/svm/")
   }
   
+  /**
+   * (count: 504310, mean: 1.411102, stdev: 0.130589, max: 1.882736, min: 0.100000)
+   */
+  def resumeEvaluate(sc: SparkContext) =
+  {
+    // cookieid + \t + resume
+    val users = sc.textFile("/home/team016/middata/stage2/test_user_resume/", 100)
+                     .map(_.split("\t"))
+                     .map { case Array(cookieid, resume) => (cookieid, resume) }
+                     .groupByKey
+                     .map { case (cookieid, resumeIter) => (cookieid, User(cookieid=cookieid, resumes=resumeIter.map(Resume(_)).toSeq)) }
+//                     .collectAsMap
+                     
+    val test_data = sc.textFile("/home/team016/middata/stage2/testdata/", 100)
+     
+    val cmcLocals = util.cmcLocal(sc)
+    val cmcCates = util.cmcCates(sc)
+    
+    val positions = test_data.flatMap { record =>
+                             val values = record.split("\001")
+                             val cookieid = values(0)
+                             
+                             if (values.length > 15) {
+                                val position = Position(values.slice(2, 25))
+                                val enterprise = Enterprise(values.slice(25, 46))
+                                position.enterprise = enterprise 
+                                Some(cookieid, position)
+                              } else {
+                                None
+                              }
+                          }
+                          
+    positions.leftOuterJoin(users)
+             .map { case (cookieid, (position, user)) => cookieid + "\t" + position.infoid + "\t" + (if (user == None) 0 else 2-user.get.matches(position, cmcCates, cmcLocals)) }
+             .saveAsTextFile("/home/team016/middata/stage2/result/resume2/")
+  }
   
 //  def dtEvaluate(sc: SparkContext, cookieid: String, p: Position) =
 //  {
@@ -700,11 +736,22 @@ object Evaluate
                     .map(_.split(sep))
                     .map { case Array(cookieid,infoid,score) => (cookieid + sep + infoid, score) }
     
+    val resumescore = sc.textFile("/home/team016/middata/stage2/result/resume/") // 961957
+                    .map(_.split(sep))
+                    .map { case Array(cookieid,infoid,score) => (cookieid + sep + infoid, score) }
+    
     val lrclscore = sc.textFile("/home/team016/middata/stage2/result/lr_cl/") // 961957 - 12699 = 949258
                     .map(_.split(sep))
                     .filter(_(1) != "--")
                     .map { case Array(cookieid,infoid,score) => (cookieid + sep + infoid, score) } 
     
+    lrscore.leftOuterJoin(resumescore)
+           .map { case (cookie_info, (lr_score, op_resume_score)) => 
+                     val resume_score = if (op_resume_score == None) 0d else op_resume_score.get.toDouble
+                     cookie_info + sep + (lr_score.toDouble + 2 - resume_score * 0.1) }
+           .repartition(10)
+           .saveAsTextFile("/home/team016/middata/stage2/result/lr_resume")
+           
     lrscore.leftOuterJoin(dtscore)
            .map { case (cookie_info, (lr_score, op_cl_score)) => 
                      val cf_score = if (op_cl_score == None) 0d else op_cl_score.get.toDouble
@@ -817,6 +864,9 @@ object Evaluate
       
     if (args(0) == "evaluateLRClick")
       evaluateLRClick(sc)
+      
+    if (args(0) == "resume")
+      resumeEvaluate(sc)
     /*
     val click_score = sc.textFile("/home/team016/middata/click_evaluate")
                         .map(_.split(sep))

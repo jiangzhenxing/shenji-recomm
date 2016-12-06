@@ -33,15 +33,30 @@ case class Resume( id: String,				    // 简历ID
  */
 object Resume 
 {
-  def apply(record: String) = 
+  def apply(record: String): Resume = 
   {
-    
+    val values = record.split("\001")
+    Resume( id = values(0),
+            userid = values(1),		    // 简历用户ID
+						targetCateid = values(3),  // 目标职位类别ID，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联 eg:2620,2811,2414,2238,2701
+						targetAreaid = values(21),	// 目标城市
+						deliveryCateid = values(29),// 真实投递类别 没有为'-'
+						deliveryAreaid = values(30),  // 真实投递地域
+						salary = if (values(6) == "-") 1 else values(6).toInt,		        // 期望薪资，1：面议 2：1000以下 3：1000-2000 4:2000-3000 5:3000-5000 6:5000-8000 7:8000-12000 8:12000-20000 9:20000-25000 10:25000以上
+						                       // 期望薪资，0：面议 1：1000以下 2：1000-2000 3：2000-3000 4: 3000-5000 5：5000-8000  6：8000-12000 7：12000-20000 8：20000-25000 9：25000以上
+						nowSalary = if (values(20) == "-") 1 else values(20).toInt,		    // 现薪资段，1：面议 2：1000以下 3：1000-2000 4:2000-3000 5:3000-5000 6:5000-8000 7:8000-12000 8:12000-20000 9:20000-25000 10:25000以上
+						education = if (values(7) == "-") 1 else values(7).toInt,		    // 教育程度，1:高中以下 2:高中 3:技校 4:中专 5:大专 6:本科 7:硕士 8:博士
+						rdoidentity = values(23).toInt,		// 个人身份，1:在校学生 0:社会人才
+						workedyears = if (values(5) == "-") 0 else values(5).toInt,    // 工作年限，0:不限 1:1-3年 2:3-5年 3:5-10年 4:10年以上 5:应届生 6:1年以下
+						complete = values(17).toInt,		    // 简历完整度,分数，如：70,80
+						updateDate = new Date(values(18).toLong),		  // 最近更新时间戳
+						addDate = new Date(values(19).toLong) )		      // 创建时间戳)
   }
 }
 
 class ResumeInfo(  val id: String,				    // 简历ID
 									 val userid: String,		    // 简历用户ID
-									 val nowPosition: String,		// 当前职位
+									 val nowPosition: String,   // 当前职位
 									 val targetCateid: String,  // 目标职位类别ID，可与hdp_58_common_defaultdb.ds_dict_cmc_category关联
 									 val targetPosition: String,// 目标职位
 									 val salary: Int,		        // 期望薪资，1：面议 2：1000以下 3：1000-2000 4:2000-3000 5:3000-5000 6:5000-8000 7:8000-12000 8:12000-20000 9:20000-25000 10:25000以上

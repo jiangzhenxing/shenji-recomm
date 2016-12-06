@@ -1,6 +1,8 @@
 package com.bj58.shenji.data
 
 import scala.collection.mutable.Set
+import scala.collection.Map
+
 import com.bj58.shenji.util._
 
 /**
@@ -10,10 +12,10 @@ import com.bj58.shenji.util._
  */
 case class User(
     cookieid: String,
-    userid: String,
-    resumes: Seq[Resume] = Seq(),
-    cmcCates: Map[String,String],  // cmc_cate的映射，key为cateid, value为fullcatepaths，以','分隔
-    cmcLocals: Map[String,String]  // cmc_local的映射，key为areaid, value为fullpath，以','分隔
+//    userid: String,
+    resumes: Seq[Resume] = Seq()
+//    cmcCates: Map[String,String],  // cmc_cate的映射，key为cateid, value为fullcatepaths，以','分隔
+//    cmcLocals: Map[String,String]  // cmc_local的映射，key为areaid, value为fullpath，以','分隔
     ) extends Serializable
 {
   /**
@@ -28,14 +30,14 @@ case class User(
    * workedyears: 	工作年限，0:不限 1:1-3年 2:3-5年 3:5-10年 4:10年以上 5:应届生 6:1年以下
    * 							如果职位要求是不限，则差计为0，否则两者相减
    */
-  def matches(position: Position): Double = 
+  def matches(position: Position, cmcCates: Map[String,String], cmcLocals: Map[String,String]): Double = 
   {
     var mindis = 10000000d
     
     for (resume ← resumes) {
       // 职位类别距离,地域距离,教育程度,薪资，个人身份，工作年限
-      val disarr = Array(catedDis(targetCates(resume), position.scate1, position.scate2, position.scate3),
-                         areaDis(targetAreas(resume), positionAreas(position)),
+      val disarr = Array(catedDis(targetCates(resume, cmcCates), position.scate1, position.scate2, position.scate3),
+                         areaDis(targetAreas(resume, cmcLocals), positionAreas(position, cmcLocals)),
                          educationDis(resume.education, position.education),
                          salaryDis(resume.salary, position.salary),
                          identityDis(resume.rdoidentity, position.fresh),
@@ -50,18 +52,21 @@ case class User(
   /**
    * 职位中的地域，可能有多个，以','分隔
    */
-  def positionAreas(position: Position) =
+  def positionAreas(position: Position, cmcLocals: Map[String,String]) =
   {
-    position.local.split(",").filter(_ != "-").map(local => cmcLocals(local)).mkString(";")
+    position.local.split(",").filter(_ != "-").flatMap(local => Option(cmcLocals.getOrElse(local, null))).mkString(";")
   }
   
   /**
    * 简历中的目标职位类别，加上实际投递的职位类别
    */
-  def targetCates(resume: Resume): String =
+  def targetCates(resume: Resume, cmcCates: Map[String,String]): String =
   {
     val cates = Set[String]()
-    cates ++= resume.targetCateid.split(",")
+    
+    if (resume.targetCateid != "-")
+      cates ++= resume.targetCateid.split(",")
+    
     if (resume.deliveryCateid != "-")
       cates ++= resume.deliveryCateid.split(",")
     
@@ -74,15 +79,16 @@ case class User(
   /**
    * 简历中的目标职位类别，加上实际投递的职位类别
    */
-  def targetAreas(resume: Resume): String =
+  def targetAreas(resume: Resume, cmcLocals: Map[String,String]): String =
   {
     val areas = Set[String]()
-    areas ++= resume.targetAreaid.split(",")
+    if (resume.targetAreaid != "-")
+      areas ++= resume.targetAreaid.split(",")
     if (resume.deliveryAreaid != "-")
       areas ++= resume.deliveryAreaid.split(",")
     
     val allAreas = Set[String]()
-    areas.foreach(area => allAreas add cmcLocals(area))
+    areas.flatMap(local => Option(cmcLocals.getOrElse(local, null))).foreach(allAreas.add)
     
     allAreas.mkString(";")
   }
@@ -200,7 +206,7 @@ case class User(
   }
   
   /**
-   * 计算两个类别之间的距离，前面的为大类，后面的为子类，全部为'-'或没有相应的值，a,b的长度至少为1
+   * 计算两个类别之间的距离，前面的为大类，后面的为子类，全部为'-'或没有相应的值，a,b的长度至少为1，只比较三级
    * 大类不同距离比子类不同距离远
    */
   def treedis(a: Array[String], b: Array[String]): Double =

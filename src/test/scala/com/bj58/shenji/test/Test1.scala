@@ -4,6 +4,7 @@ import com.bj58.shenji.data._
 import scala.collection.mutable._
 import scala.util.matching.Regex
 import java.util.ArrayList
+import java.util.Date
 
 object Test1 {
   def main(args: Array[String]): Unit = {
@@ -100,8 +101,18 @@ object Test1 {
 //    val s = Scores("0-GprNdAug7J01Ijna_QrZF2pyIlEE	nWTLnWD1P1ckn1mYrjn	0.5894009880875511	0.7058823529411765	0	0")
 //    println(s.features.mkString(","))
     
-    val s = "asdfgh"
-    println(s.contains('f'))
+//    val s = "asdfgh"
+//    println(s.contains('f'))
     
+//    println(new Date(1452425189000L))
+    
+//    println(Some(1,2))
+//    println(Option(None), Some(null), Some(None), Option(null))
+    
+    val values = Range(0, 10).map(i => Range(0,10).map(_*i)).zipWithIndex.unzip
+    
+    values._1.foreach(println)
+    println("============================")
+    values._2.foreach(println)
   }
 }
