@@ -2,4 +2,4 @@ EclipseKeys.createSrc := EclipseCreateSrc.Default + EclipseCreateSrc.ManagedClas
 EclipseKeys.withSource := true
 EclipseKeys.eclipseOutput := Some(".target")
 EclipseKeys.executionEnvironment := Some(EclipseExecutionEnvironment.JavaSE16)
-
+EclipseKeys.withSource := true
