@@ -22,44 +22,10 @@ import java.util.concurrent.Callable
 
 /**
  * 评分
+ * @author jiangzhenxing
  */
 object Evaluate 
 {
-  
-//  var lrModel: LogisticRegressionModel = null;
-//  var dtModel: DecisionTreeModel = null
-//  var preCookie: String = ""
-  
-//  def evaluate(sc: SparkContext, record: String, 
-//                click_score: scala.collection.Map[String, Double], 
-//                lrModels: scala.collection.Map[String, LogisticRegressionModel],
-//                dtModels: scala.collection.Map[String, DecisionTreeModel]) =
-//  {
-//    val sep = "\t"
-//    val values = record.split(sep)
-//    val cookieid = values(0)
-//    
-//    var scorelr = 0.5
-//    var scoredt = 0.5
-//    var scoreclick = 0d
-//    var score = 0.5
-//    
-//    try {
-//      scoreclick = click_score(cookieid + sep + values(1))
-//      if (values.length > 15) {
-//        val p = position(values)
-//        val lrModel = lrModels(cookieid)
-//        val dtModel = dtModels(cookieid)
-//        scorelr = logistic(vecdot(lrModel.weights.toArray, p.lrFeatures))
-//        scoredt = dtModel.predict(Vectors.dense(p.lrFeatures))
-//        score = scorelr + scoredt * 0.4 + scoreclick * 0.1
-//      }
-//    } catch {
-//      case t: Throwable => t.printStackTrace()
-//    }
-//    (values(0), values(1), scorelr, scoredt, scoreclick, score)
-//  }
-  
   def lrsvmEvaluateTraindataAll(sc: SparkContext) =
   {
 //    val sep = "\001"
@@ -86,7 +52,7 @@ object Evaluate
                                            val position = Position(values.slice(5,28))
                                            val enterprice = Enterprise(values.slice(28, 49))
                                            position.enterprise = enterprice
-                                           (position.infoid, label(action), position.lrFeatures(blocals.value, bjobcates.value, cmcLocal)) }
+                                           (position.infoid, label(action), position.lrFeatures(blocals.value, bjobcates.value)) }
                                     .repartition(10)
                                     .toLocalIterator
                                     .map { case (infoid, label, features) => 
@@ -135,7 +101,7 @@ object Evaluate
                                            val position = Position(values.slice(5,28))
                                            val enterprice = Enterprise(values.slice(28, 49))
                                            position.enterprise = enterprice
-                                           (position.infoid, label(action), position.lrFeatures(blocals.value, bjobcates.value, cmcLocal)) }
+                                           (position.infoid, label(action), position.lrFeatures(blocals.value, bjobcates.value)) }
                                     .repartition(10)
                                     .toLocalIterator
                                     .map { case (infoid, label, features) => 
@@ -186,7 +152,7 @@ object Evaluate
                                                val position = Position(values.slice(5,28))
                                                val enterprice = Enterprise(values.slice(28, 49))
                                                position.enterprise = enterprice
-                                               (position.infoid, label(action), position.lrFeatures(blocals.value, bjobcates.value, cmcLocal)) }
+                                               (position.infoid, label(action), position.lrFeatures(blocals.value, bjobcates.value)) }
                                         .toLocalIterator
                                         .map { case (infoid, label, features) => 
                                                  (infoid, 
@@ -256,7 +222,7 @@ object Evaluate
                               val position = Position(values.slice(2, 25))
                               val enterprise = Enterprise(values.slice(25, 46))
                               position.enterprise = enterprise 
-                              val feature = position.lrFeatures(userLocals.getOrElse(cookieid, Array()), userJobCates.getOrElse(cookieid, Array()), cmcLocal)
+                              val feature = position.lrFeatures(userLocals.getOrElse(cookieid, Array()), userJobCates.getOrElse(cookieid, Array()))
                               score = util.logistic(util.vecdot(model.weights.toArray, feature))
                             }
                             Array(cookieid, infoid, score).mkString("\t")
@@ -301,7 +267,7 @@ object Evaluate
                                   val position = Position(values.slice(2, 25))
                                   val enterprise = Enterprise(values.slice(25, 46))
                                   position.enterprise = enterprise 
-                                  val feature = position.lrFeatures(userLocals.getOrElse(cookieid, Array()), userJobCates.getOrElse(cookieid, Array()), cmcLocal)
+                                  val feature = position.lrFeatures(userLocals.getOrElse(cookieid, Array()), userJobCates.getOrElse(cookieid, Array()))
                                   score = model.predict(Vectors.dense(feature))
                                 }
                                Array(cookieid, infoid, score).mkString("\t")
@@ -346,7 +312,7 @@ object Evaluate
                                   val position = Position(values.slice(2, 25))
                                   val enterprise = Enterprise(values.slice(25, 46))
                                   position.enterprise = enterprise 
-                                  val feature = position.lrFeatures(userLocals.getOrElse(cookieid, Array()), userJobCates.getOrElse(cookieid, Array()), cmcLocal)
+                                  val feature = position.lrFeatures(userLocals.getOrElse(cookieid, Array()), userJobCates.getOrElse(cookieid, Array()))
                                   score = model.predict(Vectors.dense(feature))
                                 }
                                Array(cookieid, infoid, score).mkString("\t")
@@ -433,7 +399,7 @@ object Evaluate
                                 val position = Position(values.slice(2, 25))
                                 val enterprise = Enterprise(values.slice(25, 46))
                                 position.enterprise = enterprise 
-                                val feature = position.lrFeatures(userLocals.getOrElse(cookieid, Array()), userJobCates.getOrElse(cookieid, Array()), cmcLocal)
+                                val feature = position.lrFeatures(userLocals.getOrElse(cookieid, Array()), userJobCates.getOrElse(cookieid, Array()))
                                 score = util.vecdot(model.weights.toArray, feature) // model.predict(Vectors.dense(feature))
                               }
                              Array(cookieid, infoid, score).mkString("\t")

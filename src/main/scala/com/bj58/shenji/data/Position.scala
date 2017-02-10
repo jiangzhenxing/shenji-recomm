@@ -52,7 +52,7 @@ case class Position( infoid: String,		// 职位ID
    * 产生用于逻辑回归和决策树回归模型的特征
    * 企业评分，暂缺
    */
-  def lrFeatures(locals: Array[String], jobcates: Array[String], cmcLocals: scala.collection.Map[String, String]): Array[Double] = 
+  def lrFeatures(locals: Array[String], jobcates: Array[String]): Array[Double] = 
   {
     // 职位类别one-hot编码
     val jobcateOneHot = jobcates.map(cate => if (Seq(scate1,scate2,scate3).mkString(",") == cate) 1d else 0d)

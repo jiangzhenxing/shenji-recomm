@@ -6,6 +6,7 @@ import org.apache.spark.mllib.recommendation.ALS
 
 /**
  * 协同过滤模型
+ * @author jiangzhenxing
  */
 object CFModel 
 {
@@ -15,8 +16,7 @@ object CFModel
   def train(sc: SparkContext) = 
   {
     val sep = "\t"
-    val click_count = sc.textFile("/home/team016/middata/click_count_with_code/")
-                        .repartition(80)
+    val click_count = sc.textFile("/home/team016/middata/click_count_with_code/", 80)
                         .map(_.split(sep).map(_.toInt)) // cookieid_index, infoid_index, count
                         .map { case Array(cookie,info,count) => Rating(cookie, info, count) }
                         .cache
