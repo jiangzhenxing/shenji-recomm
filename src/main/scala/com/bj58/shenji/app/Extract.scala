@@ -658,21 +658,15 @@ object Extract
     // cookieid, infoid, score
     val lrScores = sc.textFile("/home/team016/middata/stage2/result/lr", 16) // 2 034 327
                                 .map(_.split("\t"))
-                                .map { case Array(cookieid, infoid, score) => 
-                                  (cookieid + "\t" + infoid, score)
-                                }
+                                .map { case Array(cookieid, infoid, score) => (cookieid + "\t" + infoid, score) }
     
     val dtScores = sc.textFile("/home/team016/middata/stage2/result/dtpart/*", 16) // 2034327
                                 .map(_.split("\t")) 
-                                .map { case Array(cookieid, infoid, score) => 
-                                  (cookieid + "\t" + infoid, score)
-                                }
+                                .map { case Array(cookieid, infoid, score) => (cookieid + "\t" + infoid, score) }
     
     val svmScores = sc.textFile("/home/team016/middata/stage2/result/svm", 16) // 2 034 327
                                 .map(_.split("\t")) 
-                                .map { case Array(cookieid, infoid, score) => 
-                                  (cookieid + "\t" + infoid, score)
-                                }
+                                .map { case Array(cookieid, infoid, score) => (cookieid + "\t" + infoid, score) }
     
     val cfScores = sc.textFile("/home/team016/middata/stage2/result/cf/", 16)  // 1 828 996
                      .map(_.split("\t"))
