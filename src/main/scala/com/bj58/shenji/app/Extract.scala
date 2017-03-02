@@ -33,7 +33,7 @@ object Extract
     val testCookies = testCookieSet(sc)
     val bcookies = sc.broadcast(testCookies)
     val sep = "\t"
-    val detail = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/detail/dt=" + dt)
+    val detail = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/detail/dt=" + dt, 16)
                    .map(JobListRecord(_))
                    .filter(r => bcookies.value.contains(r.cookieid))
                    .map(r => (r.infoid,Array(r.cookieid,r.userid,r.infoid,r.clicktag,if (r.clicktag == "1") r.clicktime else r.stime).mkString(sep)))
@@ -56,7 +56,7 @@ object Extract
     val locals = sc.textFile("/home/team016/middata/area_city").map(_.split("\001")).map(values => (values(0),values(1))).collect.toMap
     val blocals = sc.broadcast(locals)
     
-    val detail = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/detail/*")
+    val detail = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/detail/*", 32)
                    .map(JobListRecord(_))
                    .map(r => (r.infoid,Array(r.cookieid,r.userid,r.infoid,blocals.value.getOrElse(r.sloc1,-1),r.clicktag,if (r.clicktag == "1") r.clicktime else r.stime).mkString(sep)))
                    
@@ -83,12 +83,12 @@ object Extract
     val testCookies = testCookieSet(sc)
     val bcookies = sc.broadcast(testCookies)
     
-    val action = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/useraction/dt=" + dt)
+    val action = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/useraction/dt=" + dt, 16)
                    .map(UserActionRecord(_))
                    .filter(r => bcookies.value.contains(r.cookieid))
                    .map(r => (r.infoid, Array(r.cookieid, r.userid, r.infoid, r.clicktag, r.clicktime).mkString("\t")))
                    
-    val position = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=" + dt)
+    val position = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=" + dt, 16)
                      .map(Position(_))
                      .map(p => (p.infoid, Array(p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep)))
                      
@@ -106,12 +106,12 @@ object Extract
     val testCookies = testCookieSet(sc)
     val bcookies = sc.broadcast(testCookies)
     
-    val delivery = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/delivery/dt=" + dt)
+    val delivery = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/delivery/dt=" + dt, 16)
                    .map(DeliveryRecord(_))
                    .filter(r => bcookies.value.contains(r.cookieid))
                    .map(r => (r.infoid, Array(r.cookieid, r.resumeuserid, r.infoid, "apply", r.deliverytime).mkString("\t")))
                    
-    val position = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=" + dt)
+    val position = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=" + dt, 16)
                      .map(Position(_))
                      .map(p => (p.infoid, Array(p.userid,p.scate1,p.scate2,p.scate3,p.title,p.local,p.salary,p.education,p.experience,p.trade,p.enttype,p.fuli,p.fresh,p.additional).mkString(sep)))
                      
@@ -131,14 +131,14 @@ object Extract
     
     Range(1,16).foreach { dt => 
       println("Extract " + dt)
-      val position = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=" + dt)
+      val position = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=" + dt, 16)
                        .map(line => (Position(line).userid, line))
                        
-      val enterprise_user = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/enterprise_re_user/dt=" + dt)
+      val enterprise_user = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/enterprise_re_user/dt=" + dt, 16)
                               .map(EnterpriseUser(_))
                               .map(user => (user.userid, user.enterpriseid)) // userid, enterpriseid
                               
-      val enterprise = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/enterprise/dt=" + dt)
+      val enterprise = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/enterprise/dt=" + dt, 16)
                          .map(line => (Enterprise(line).id, line))
                          
       val positionEnterprise = position.leftOuterJoin(enterprise_user)
@@ -146,17 +146,17 @@ object Extract
                                       .leftOuterJoin(enterprise)
                                       .map { case (enterpriseid, (position, enterprise)) => (Position(position).infoid, (position, if (enterprise == None) "" else enterprise.get)) }
               
-      val detail = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/detail/dt=" + dt)
+      val detail = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/detail/dt=" + dt, 16)
                      .map(JobListRecord(_))
                      .filter(record => bcookies.value.contains(record.cookieid))
                      .map(r => (r.infoid,Array(r.cookieid,r.userid,r.infoid,r.clicktag,if (r.clicktag == "1") r.clicktime else r.stime).mkString(sep)))
       
-      val action = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/useraction/dt=" + dt)
+      val action = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/useraction/dt=" + dt, 16)
                      .map(UserActionRecord(_))
                      .filter(r => bcookies.value.contains(r.cookieid))
                      .map(r => (r.infoid, Array(r.cookieid, r.userid, r.infoid, r.clicktag, r.clicktime).mkString(sep)))
                      
-      val delivery = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/delivery/dt=" + dt)
+      val delivery = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/delivery/dt=" + dt, 16)
                      .map(DeliveryRecord(_))
                      .filter(r => bcookies.value.contains(r.cookieid))
                      .map(r => (r.infoid, Array(r.cookieid, r.resumeuserid, r.infoid, "apply", r.deliverytime).mkString(sep)))
@@ -177,7 +177,7 @@ object Extract
   {
     import com.bj58.shenji.data.Position
     val sep = "\001"
-    val traindata = sc.textFile("/home/team016/middata/stage2/traindata/*")
+    val traindata = sc.textFile("/home/team016/middata/stage2/traindata/*", 16)
     traindata.map(_.split(sep)) // detail:0-5; position:5-29; enterprise:29-51
              .filter(_(3) != "0")
              .map { values => val p = Position(values.slice(5,29))
@@ -202,7 +202,7 @@ object Extract
 //                   .collectAsMap
 //    val blocals = sc.broadcast(locals)
     
-    val traindata = sc.textFile("/home/team016/middata/stage2/traindata/*")
+    val traindata = sc.textFile("/home/team016/middata/stage2/traindata/*", 16)
     traindata.map(_.split(sep)) // detail:0-5; position:5-29; enterprise:29-51
              .filter(_(3) != "0")
              .flatMap { values => val p = Position(values.slice(5,29))
@@ -227,7 +227,7 @@ object Extract
                    .collectAsMap
     val blocals = sc.broadcast(locals)
     
-    val traindata = sc.textFile("/home/team016/middata/traindata/*")
+    val traindata = sc.textFile("/home/team016/middata/traindata/*", 16)
     traindata.map(_.split(sep)) // detail:0-5; position:5-29; enterprise:29-51
              .filter(_(3) != "0")
              .flatMap { values => val p = Position(values.slice(5,29))
@@ -246,11 +246,11 @@ object Extract
   {
     val sep = "\t"
     
-    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
+    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/", 16)
                      .map(_.split("\001"))
                      .map(values => (values(1).trim, values(0))) // infoid, cookieid
                      
-    val positions = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=16")
+    val positions = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=16", 16)
                       .map(p => (p.substring(0, p.indexOf("\001")).trim, p))  // infoid, position
                       
     testdata.leftOuterJoin(positions)
@@ -267,26 +267,31 @@ object Extract
   {
     val sep = "\001"
     
-    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage2/testdata/")
-                     .map(_.split("\001"))
-                     .map(values => (values(1).trim, values(0))) // infoid, cookieid
-                     
-    val positions = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=16")
-                      .map(line => (Position(line).userid, line))  // userid, position
-                      
-    val enterprise_user = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/enterprise_re_user/dt=16")
-                            .map(EnterpriseUser(_))
-                            .map(user => (user.userid, user.enterpriseid)) // userid, enterpriseid
-                            
-    val enterprise = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/enterprise/dt=16")
-                       .map(line => (Enterprise(line).id, line))
+    val testdata = 
+            sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage2/testdata/", 16)
+              .map(_.split("\001"))
+              .map(values => (values(1).trim, values(0))) // infoid, cookieid
+
+    val positions = 
+            sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/position/dt=16", 16)
+              .map(line => (Position(line).userid, line))  // userid, position
+
+    val enterprise_user = 
+            sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/enterprise_re_user/dt=16", 16)
+              .map(EnterpriseUser(_))
+              .map(user => (user.userid, user.enterpriseid)) // userid, enterpriseid
+
+    val enterprise = 
+            sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/enterprise/dt=16", 16)
+              .map(line => (Enterprise(line).id, line))
                        
-    val positionEnterprise = positions.leftOuterJoin(enterprise_user)
-                                      .map { case (userid, (position, enterpriseid)) => (if (enterpriseid == None) "-" else enterpriseid.get, position) }
-                                      .leftOuterJoin(enterprise)
-                                      .map { case (enterpriseid, (position, enterprise)) => (Position(position).infoid, (position, if (enterprise == None) "" else enterprise.get)) }
-                                      // infoid,(position,enterprise)
-              
+    val positionEnterprise = 
+            positions.leftOuterJoin(enterprise_user)
+                     .map { case (userid, (position, enterpriseid)) => (if (enterpriseid == None) "-" else enterpriseid.get, position) }
+                     .leftOuterJoin(enterprise)
+                     .map { case (enterpriseid, (position, enterprise)) => (Position(position).infoid, (position, if (enterprise == None) "" else enterprise.get)) }
+                     // infoid,(position,enterprise)
+
     testdata.leftOuterJoin(positionEnterprise)
             .map { case (infoid, (cookieid,pe)) => cookieid + sep + infoid + sep +  (if (pe == None) "--" else pe.get._1 + sep + pe.get._2) }
             .repartition(32)
@@ -300,7 +305,7 @@ object Extract
   {
     val sep = "\t"
     // 找到用户id
-    val listUser = (sc.textFile("/home/team016/middata/stage2/traindatabyuser/")
+    val listUser = (sc.textFile("/home/team016/middata/stage2/traindatabyuser/", 16)
                       .repartition(100)
                      .map(_.split("\001"))
                      .map(values => (values(1),values(0))) // userid, cookieid
@@ -309,9 +314,9 @@ object Extract
 //    listUser.map { case (userid, cookieid) => cookieid + "\t" + userid }
 //            .saveAsTextFile("/home/team016/middata/test_cookie_user")
             
-    val resume = (sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/resume/*")
+    val resume = (sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/traindata/resume/*", 16)
                     .repartition(100)
-                      .map(p => (p.split("\001", 3)(1), p))) // userid, resume
+                    .map(p => (p.split("\001", 3)(1), p))) // userid, resume
     listUser.join(resume)
             .mapValues { case (cookieid, resume) => cookieid + sep + resume }
             .map(_._2)
@@ -385,9 +390,10 @@ object Extract
     val unionRecords = list_position.union(action_position)
     
     testCookies.map(cookieid => (cookieid,unionRecords.filter(record => record.substring(0, record.indexOf("\t")) == cookieid)))
-               .map {case (cookieid, records) => records.cache()
-                                                        .sortBy(_.split("\t",7)(4).toLong)
-                                                        .saveAsTextFile("/home/team016/middata/test_all_action_by_user/" + cookieid) }
+               .map { case (cookieid, records) => 
+                         records.cache()
+                                .sortBy(_.split("\t",7)(4).toLong)
+                                .saveAsTextFile("/home/team016/middata/test_all_action_by_user/" + cookieid) }
   }
   
   def exactResult(sc: SparkContext) =
@@ -423,11 +429,11 @@ object Extract
   {
     val sep = "\t"
     // (0,19 155 442) (1,637829)
-    val list_position = sc.textFile("/home/team016/middata/test_list_position/*")
+    val list_position = sc.textFile("/home/team016/middata/test_list_position/*", 16)
     // 87895
-    val action_position = sc.textFile("/home/team016/middata/test_action_position/*")
+    val action_position = sc.textFile("/home/team016/middata/test_action_position/*", 16)
     
-    val delivery_position = sc.textFile("/home/team016/middata/test_delivery_position/*")
+    val delivery_position = sc.textFile("/home/team016/middata/test_delivery_position/*", 16)
     
     // (cookieid,0),(userid,1),(infoid,2),(clicktag,3),(clicktime,4),(userid,5),(scate1,6),(scate2,7),(scate3,8),(title,9),(local,10),
     // (salary,11),(education,12),(experience,13),(trade,14),(enttype,15),(fuli,16),(fresh,17),(additional,18)
@@ -467,7 +473,7 @@ object Extract
   
   def userDataCount(sc: SparkContext) = 
   {
-    sc.textFile("/home/team016/middata/stage2/traindatabyuser/")
+    sc.textFile("/home/team016/middata/stage2/traindatabyuser/", 16)
       .map(line => (line.split("\001")(0), 1))
       .reduceByKey(_ + _)
       .map(kv => kv._1 + "\t" + kv._2)
@@ -479,7 +485,7 @@ object Extract
    */
   def testLocalJobCates(sc: SparkContext) = 
   {
-    val test_data = sc.textFile("/home/team016/middata/test_train_data/")
+    val test_data = sc.textFile("/home/team016/middata/test_train_data/", 16)
     val locals = sc.textFile("/home/team016/middata/area_city").map(_.split("\001")).map(values => (values(0),values(1))).collect.toMap
 //    val test_local = test_data.map(_.split("\t")).flatMap(values => values(10).split(",").map(locals.getOrElse(_,"-1"))).distinct.collect
     test_data.map(_.split("\t"))
@@ -493,7 +499,7 @@ object Extract
    */
   def idcode(sc: SparkContext)
   {
-    val click_count = sc.textFile("/home/team016/middata/click_count/")
+    val click_count = sc.textFile("/home/team016/middata/click_count/", 16)
                         .map(_.split("\001"))
 
     val cookieids = click_count.map(_(0)) // 9276870,9699254
@@ -520,14 +526,14 @@ object Extract
   def click_count_with_code(sc: SparkContext)
   {
     val sep = "\t"
-    val click_count = sc.textFile("/home/team016/middata/click_count/")
+    val click_count = sc.textFile("/home/team016/middata/click_count/", 16)
                         .map(_.split("\001")) // cookieid,infoid,click_count
                         
-    val cookieid_code = sc.textFile("/home/team016/middata/cookieid_code/")
+    val cookieid_code = sc.textFile("/home/team016/middata/cookieid_code/", 16)
                           .map(_.split(sep))
                           .map(values => (values(0), values(1))) // cookieid, index
                           
-    val infoid_code = sc.textFile("/home/team016/middata/infoid_code")
+    val infoid_code = sc.textFile("/home/team016/middata/infoid_code", 16)
                         .map(_.split(sep))
                         .map(values => (values(0), values(1))) // infoid, index
                         
@@ -546,14 +552,14 @@ object Extract
   {
     val sep = "\t"
     
-    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
+    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/", 16)
                      .map(_.split("\001"))  // cookieid,infoid
                      
-    val cookieid_code = sc.textFile("/home/team016/middata/cookieid_code/")
+    val cookieid_code = sc.textFile("/home/team016/middata/cookieid_code/", 16)
                           .map(_.split(sep))
                           .map(values => (values(0), values(1))) // cookieid, index
                           
-    val infoid_code = sc.textFile("/home/team016/middata/infoid_code")
+    val infoid_code = sc.textFile("/home/team016/middata/infoid_code", 16)
                         .map(_.split(sep))
                         .map(values => (values(0), values(1))) // infoid, index
                         
@@ -573,14 +579,14 @@ object Extract
   {
     val sep = "\t"
     
-    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/")
+    val testdata = sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage1/testdata/", 16)
                      .map(_.split("\001"))  // cookieid,infoid
                      
-    val cookieid_code = sc.textFile("/home/team016/middata/cookieid_code/")
+    val cookieid_code = sc.textFile("/home/team016/middata/cookieid_code/", 16)
                           .map(_.split(sep))
                           .map(values => (values(0), values(1))) // cookieid, index
                           
-    val infoid_code = sc.textFile("/home/team016/middata/infoid_code")
+    val infoid_code = sc.textFile("/home/team016/middata/infoid_code", 16)
                         .map(_.split(sep))
                         .map(values => (values(0), values(1))) // infoid, index
                         
@@ -620,19 +626,19 @@ object Extract
   def extracTrainScoreByUser(sc: SparkContext) =
   {
     // cookieid, infoid, lrscore, dtscore, svmscore, label
-    val lrdtsvmscore = sc.textFile("/home/team016/middata/stage2/train_result/lrdtsvmbyuser/all/*")
+    val lrdtsvmscore = sc.textFile("/home/team016/middata/stage2/train_result/lrdtsvmbyuser/all/*", 16)
                                 .map(_.split("\t")) 
                                 .map { case Array(cookieid, infoid, lrscore, dtscore, svmscore, label) => 
                                   (cookieid + "\t" + infoid, (lrscore, dtscore, svmscore, label))
                                 }
                                 .repartition(100)
-    val cfScores = sc.textFile("/home/team016/middata/stage2/train_result/cf/")  // 32 203 297 * 100
+    val cfScores = sc.textFile("/home/team016/middata/stage2/train_result/cf/", 16)  // 32 203 297 * 100
                      .map(_.split("\t"))
                      .map { case Array(cookieid, infoid, score) => (cookieid + "\t" + infoid, score) }
                      .distinct()
                      .repartition(100)
     // cookieid, infoid, clickscore, label(action)
-    val clickScores = sc.textFile("/home/team016/middata/stage2/train_result/click/")
+    val clickScores = sc.textFile("/home/team016/middata/stage2/train_result/click/", 16)
                      .map(_.split("\t"))
                      .map { case Array(cookieid, infoid, score, label) => (cookieid + "\t" + infoid, score) }
                      .distinct
@@ -650,30 +656,30 @@ object Extract
   def extractTestScore(sc: SparkContext) =
   {
     // cookieid, infoid, score
-    val lrScores = sc.textFile("/home/team016/middata/stage2/result/lr") // 2 034 327
+    val lrScores = sc.textFile("/home/team016/middata/stage2/result/lr", 16) // 2 034 327
                                 .map(_.split("\t"))
                                 .map { case Array(cookieid, infoid, score) => 
                                   (cookieid + "\t" + infoid, score)
                                 }
     
-    val dtScores = sc.textFile("/home/team016/middata/stage2/result/dtpart/*") // 2034327
+    val dtScores = sc.textFile("/home/team016/middata/stage2/result/dtpart/*", 16) // 2034327
                                 .map(_.split("\t")) 
                                 .map { case Array(cookieid, infoid, score) => 
                                   (cookieid + "\t" + infoid, score)
                                 }
     
-    val svmScores = sc.textFile("/home/team016/middata/stage2/result/svm") // 2 034 327
+    val svmScores = sc.textFile("/home/team016/middata/stage2/result/svm", 16) // 2 034 327
                                 .map(_.split("\t")) 
                                 .map { case Array(cookieid, infoid, score) => 
                                   (cookieid + "\t" + infoid, score)
                                 }
     
-    val cfScores = sc.textFile("/home/team016/middata/stage2/result/cf/")  // 1 828 996
+    val cfScores = sc.textFile("/home/team016/middata/stage2/result/cf/", 16)  // 1 828 996
                      .map(_.split("\t"))
                      .map { case Array(cookieid, infoid, score) => (cookieid + "\t" + infoid, score) }
     
     // cookieid, infoid, clickscore, label(action)
-    val clickScores = sc.textFile("/home/team016/middata/stage2/result/click_evaluate/") // 2034327
+    val clickScores = sc.textFile("/home/team016/middata/stage2/result/click_evaluate/", 16) // 2034327
                      .map(_.split("\t"))
                      .map { case Array(cookieid, infoid, score) => (cookieid + "\t" + infoid, score) }
     // lrscore, dtscore, svmscore, cfscore, clickscore
@@ -713,7 +719,7 @@ object Extract
   
   def extractTestCookie(sc: SparkContext) =
   {
-    sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage2/testdata/")
+    sc.textFile("/home/hdp_hrg_game/shenjigame/data/stage2/testdata/", 16)
       .map(_.split("\001")(0))
       .distinct()
       .saveAsTextFile("/home/team016/middata/stage2/test_cookies/")

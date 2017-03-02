@@ -37,19 +37,7 @@ object SVMModel extends Serializable
    * (HZGNrH7_u-FHn7I2rytdEhQsnNOaIk,50940), (pvG8ihRAmWFiP17JpRcdwg7Y0LDYNE,39409), (uA-ZPD-AuHP2rAF_Pv-oIY_1w1FNNE,37100), (RDqMHZ6Ay-ufNRwoi1wFpZKFU7uhuk,33170), (m1NfUhbQubPhUbG5yWKpPYFn07FKuk,32937), (m1NfUh3QuhcYwNuzyAt30duwXMPKuk,30431), (NDwwyBqyugRvuDOOE1EosdR3ERRdNE,28696), (m1NfUh3QuA_oIR73N-E30DPlRh6Kuk,28512), (w-RDugRAubGPNLFWmYNoNgPJnAqvNE,28509), (uvVYENdyubQVuRw8pHwuEN65PLKOIk,28178), (RNu7u-GAm1Nd0vF3rNI7RWK8IZK_EE,27172), (UvqNu7K_uyIgyWR60gDvw7GjPA6GNE,27093), (yb0Qwj7_uRRC2YIREycfRM-jm17ZIk,26737), (m1NfUh3QuhR2NWNduDqWi7uWmdFKuk,26402), (njRWwDuARMmo0A6amNqCuDwiibRKuk,25908), (m1NfUh3Qu-PgnMw701FpmREvIZ6Kuk,25574), (m1NfUMnQu-PrmvqJP-PEiY7LIHPKuk,25363), (m1NfUhbQujboiZKAEM0zNY7OUYVKuk,25254), (m1NfUMK_mv_OEy7VnL0OpYndPd6Kuk,24649)
    */
   val logger = LoggerFactory.getLogger("LRModel")
-  
-  def trainAll(sc: SparkContext) =
-  {
-    // /home/team016/middata/model5/
-    train(sc, "/home/team016/middata/stage2/test_cookies",
-              "/home/team016/middata/stage2/model/svm")
-  }
-  
-  def trainPart(sc: SparkContext, part: Int) =
-  {
-    train(sc, "/home/team016/middata/stage2/test_cookies_split10/part" + part,
-              "/home/team016/middata/stage2/model3/svm/part" + part)
-  }
+  val minPartitions = 24  // 最小分区数，对于计算密集型任务，可设为集群CPU核数
   
   def train(sc: SparkContext, cookiePath: String, output: String) =
   {
@@ -76,7 +64,7 @@ object SVMModel extends Serializable
   def trainUser(sc: SparkContext, cookieid: String, jobcates: Array[String], locals: Array[String], output: String) =
   {
     try {
-          val train_data = sc.textFile("/home/team016/middata/stage2/traindatabyuser_split/train80/" + cookieid)
+          val train_data = sc.textFile("/home/team016/middata/stage2/traindatabyuser_split/train80/" + cookieid, minPartitions)
           // 5 + 23 + 21 detail:0-5; position:5-28; enterprise:28-49
           val rawdatas = train_data.map(_.split("\001"))
                                    .map { values => 

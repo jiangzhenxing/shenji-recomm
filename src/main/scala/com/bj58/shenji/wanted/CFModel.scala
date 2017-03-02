@@ -13,15 +13,15 @@ object CFModel
   /**
    * 训练
    */
-  def train(sc: SparkContext) = 
+  def train(sc: SparkContext, input: String, output: String) = 
   {
     val sep = "\t"
-    val click_count = sc.textFile("/home/team016/middata/click_count_with_code/", 80)
+    val click_count = sc.textFile(input, 80)
                         .map(_.split(sep).map(_.toInt)) // cookieid_index, infoid_index, count
                         .map { case Array(cookie,info,count) => Rating(cookie, info, count) }
                         .cache
     ALS.trainImplicit(ratings=click_count, rank=16, iterations=40, lambda=0.01, alpha=40)
-       .save(sc, "home/team016/middata/model/cf2/")
+       .save(sc, output)
   }
   
 }

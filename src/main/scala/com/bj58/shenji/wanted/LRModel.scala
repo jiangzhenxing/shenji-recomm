@@ -35,22 +35,8 @@ import java.util.concurrent.atomic.AtomicInteger
 object LRModel extends Serializable
 {
   val logger = LoggerFactory.getLogger("LRModel")
+  val minPartitions = 24  // 最小分区数，对于计算密集型任务，可设为集群CPU核数
   
-  def trainAll(sc: SparkContext) =
-  {
-    train(sc, "/home/team016/middata/stage2/test_cookies",
-              "/home/team016/middata/stage2/model/lr")
-  }
-  
-  /**
-   * 为减少训练时间，启动多个任务，每个任务训练部分用户模型
-   */
-  def trainPart(sc: SparkContext, part: Int) =
-  {
-    train(sc, "/home/team016/middata/stage2/test_cookies_split10/part" + part,
-              "/home/team016/middata/stage2/model/lr_clean/part" + part)
-  }
-    
   def train(sc: SparkContext, cookiePath: String, lroutput: String) =
   {
       val sep = "\t"
@@ -102,7 +88,7 @@ object LRModel extends Serializable
   def trainUser(sc: SparkContext, cookieid: String, jobcates: Array[String], locals: Array[String], lroutput: String) =
   {
     try {
-          val train_data = sc.textFile("/home/team016/middata/stage2/traindatabyuser_split/train80/" + cookieid)
+          val train_data = sc.textFile("/home/team016/middata/stage2/traindatabyuser_split/train80/" + cookieid, minPartitions)
           // 5 + 23 + 21 detail:0-5; position:5-28; enterprise:28-49
           val rawdatas = train_data.map(_.split("\001"))
                                    .map { values => 

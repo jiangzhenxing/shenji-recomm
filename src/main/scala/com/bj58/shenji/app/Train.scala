@@ -20,24 +20,29 @@ object Train
     val sc = new SparkContext(conf)
     sc.setLogLevel("WARN")
     
-    if (args(0) == "train")
-      LRModel.trainAll(sc)
-    
-    if (args(0) == "LRPart")
-      trainLRPart(sc, args(1).toInt)
-    
-    if (args(0) == "DTPart") // 0,1,2
-      trainDTPart(sc, args(1).toInt)
-    
-    if (args(0) == "CF") {
-      trainCF(sc)
+    if (args(0).toUpperCase() == "LRPART") {
+      val part = args(1)
+      trainLR(sc, "/home/team016/middata/stage2/test_cookies_split10/part" + part,
+              "/home/team016/middata/stage2/model/lr_clean/part" + part)
     }
     
-    if (args(0) == "SVMPart") {
-      trainSVMPart(sc, args(1).toInt)
+    if (args(0).toUpperCase() == "DTPART") {
+      val part = args(1)
+      trainDT(sc, "/home/team016/middata/stage2/test_cookies_split10/part" + part,
+              "/home/team016/middata/stage2/model/dt_last/part" + part)
     }
     
-    if (args(0) == "ComprehensivePart") {
+    if (args(0).toUpperCase() == "CF") {
+      trainCF(sc, "/home/team016/middata/click_count_with_code/", "home/team016/middata/model/cf2/")
+    }
+    
+    if (args(0).toUpperCase() == "SVMPart".toUpperCase()) {
+      val part = args(1)
+      trainSVM(sc, "/home/team016/middata/stage2/test_cookies_split10/part" + part,
+              "/home/team016/middata/stage2/model3/svm/part" + part)
+    }
+    
+    if (args(0).toUpperCase() == "ComprehensivePart".toUpperCase()) {
       trainComprehensive(sc, "/home/team016/middata/stage2/test_cookies_split10/part" + args(1))
     }
     

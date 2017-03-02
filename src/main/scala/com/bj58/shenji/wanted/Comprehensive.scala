@@ -14,6 +14,7 @@ import org.apache.spark.mllib.classification.SVMWithSGD
  */
 object Comprehensive 
 {
+  val minPartitions = 24  // 最小分区数，对于计算密集型任务，可设为集群CPU核数
   var n = 0
   def train(sc: SparkContext, cookiePath: String) =
   {
@@ -30,7 +31,7 @@ object Comprehensive
     n = n + 1
     println(cookieid + "\ttrained " + n + " *****************************************") // /home/team016/middata/stage2/train_result/clickbyuser/
     
-    val train_score = sc.textFile("/home/team016/middata/stage2/train_result/allscorebyuser/" + cookieid + "-*")
+    val train_score = sc.textFile("/home/team016/middata/stage2/train_result/allscorebyuser/" + cookieid + "-*", minPartitions)
                         .map(_.split("\t")) // cookie, info, lrscore, dtscore, svmscore, cfscore, clickscore, label
                         .map { case Array(cookieid, infoid, lrscore, dtscore, svmscore, cfscore, clickscore, label) => 
                                val features = Array(lrscore, dtscore, svmscore, cfscore, clickscore).map(_.toDouble)

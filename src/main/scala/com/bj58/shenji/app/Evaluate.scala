@@ -26,63 +26,15 @@ import java.util.concurrent.Callable
  */
 object Evaluate 
 {
-  def lrsvmEvaluateTraindataAll(sc: SparkContext) =
+
+  def lrdtsvmEvaluateTraindataPart(sc: SparkContext, partCookiePath: String, scorePath: String) =
   {
 //    val sep = "\001"
-    val testCookies = sc.textFile("/home/team016/middata/stage2/test_cookies/").collect.toSet
+    val testCookies = sc.textFile(partCookiePath).collect.toSet
     val userJobCates = util.userJobcates(sc)
     val userLocals = util.userLocals(sc)
     val cmcLocal = Map[String, String]() // util.cmcLocal(sc)
-//    val log = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("/home/team016/shenji/spark/lrdtsvmEvaluateTraindataPart.error" + part)))
-    
-    testCookies.map { cookieid =>
-        println(cookieid)
-        val bjobcates = sc.broadcast(userJobCates.getOrElse(cookieid, Array()))
-        val blocals = sc.broadcast(userLocals.getOrElse(cookieid, Array()))
-        
-        try {
-          val train_data = sc.textFile("/home/team016/middata/stage2/traindatabyuser_split/train20/" + cookieid)
-              val lrmodel = LogisticRegressionModel.load(sc, "/home/team016/middata/stage2/model80/lr/all/" + cookieid)
-//              val dtmodel = DecisionTreeModel.load(sc, "/home/team016/middata/stage2/model80/dt2/part" + part + "/" + cookieid)
-              val svmmodel = SVMModel.load(sc, "/home/team016/middata/stage2/model80/svm/all/" + cookieid)
-          
-          val result = train_data.map(_.split("\001"))
-                                   .map { values => 
-                                           val action = values(3)
-                                           val position = Position(values.slice(5,28))
-                                           val enterprice = Enterprise(values.slice(28, 49))
-                                           position.enterprise = enterprice
-                                           (position.infoid, label(action), position.lrFeatures(blocals.value, bjobcates.value)) }
-                                    .repartition(10)
-                                    .toLocalIterator
-                                    .map { case (infoid, label, features) => 
-                                               (infoid, 
-                                                label, 
-                                                util.logistic(util.vecdot(lrmodel.weights.toArray, features)), 
-//                                                dtmodel.predict(Vectors.dense(features)),
-                                                util.vecdot(svmmodel.weights.toArray, features)) }
-                                    .map { case (infoid, label, lrscore, svmscore) => 
-                                               Array(cookieid, infoid, lrscore, svmscore, label).mkString("\t") }
-          sc.parallelize(result.toSeq).saveAsTextFile("/home/team016/middata/stage2/train_result/lrsvmbyuser/" + cookieid)
-        } catch {
-          case t: Throwable => t.printStackTrace() // TODO: handle error
-//                               log.write(cookieid + " in part" + part + "\n")
-        } finally {
-            bjobcates.destroy()
-            blocals.destroy()
-        }
-//        log.close()
-    }
-  }
-  
-  def lrdtsvmEvaluateTraindataPart(sc: SparkContext, part: Int) =
-  {
-//    val sep = "\001"
-    val testCookies = sc.textFile("/home/team016/middata/stage2/test_cookies_split10/part" + part).collect.toSet
-    val userJobCates = util.userJobcates(sc)
-    val userLocals = util.userLocals(sc)
-    val cmcLocal = Map[String, String]() // util.cmcLocal(sc)
-    val log = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("/home/team016/shenji/spark/lrdtsvmEvaluateTraindataPart.error" + part)))
+//    val log = new BufferedWriter(new OutputStreamWriter(new FileOutputStream("/home/team016/shenji/spark/lrdtsvmEvaluateTraindataPart.error")))
     val some = "XyPGPhF_u-GyRgFBwHPzuNRzPZ6DNE"
     testCookies.map { cookieid =>
         println(cookieid)
@@ -110,67 +62,15 @@ object Evaluate
                                       val svmscore = util.vecdot(svmmodel.weights.toArray, features)
                                       Array(cookieid, infoid, lrscore, dtscore, svmscore, label).mkString("\t") }
                                     
-          sc.parallelize(result.toSeq).saveAsTextFile("/home/team016/middata/stage2/train_result/lrdtsvmbyuser/part" + part + "/" + cookieid)
+          sc.parallelize(result.toSeq).saveAsTextFile(scorePath + "/" + cookieid)
         } catch {
-          case t: Throwable => t.printStackTrace() // TODO: handle error
-                               log.write(cookieid + " in part" + part + "\n")
+          case t: Throwable => t.printStackTrace()
+                               print(cookieid + " in: " + partCookiePath)
         } finally {
             bjobcates.destroy()
             blocals.destroy()
         }
-        log.close()
     }
-  }
-  
-  def lrdtsvmEvaluateTraindataCon(sc: SparkContext) =
-  {
-//    val sep = "\001"
-    val testCookies = sc.textFile("/home/team016/middata/stage2/test_cookies").collect.toSet
-    val userJobCates = util.userJobcates(sc)
-    val userLocals = util.userLocals(sc)
-    val cmcLocal = Map[String, String]() // util.cmcLocal(sc)
-    
-    val executor = Executors.newFixedThreadPool(8)
-    
-    testCookies.map { cookieid =>
-        println(cookieid)
-        
-        
-        executor.submit(new Callable[String]() {
-          override def call() = {
-            val bjobcates = sc.broadcast(userJobCates.getOrElse(cookieid, Array()))
-            val blocals = sc.broadcast(userLocals.getOrElse(cookieid, Array()))
-            try {
-              val train_data = sc.textFile("/home/team016/middata/stage2/traindatabyuser_split/train20/" + cookieid)
-              val lrmodel = LogisticRegressionModel.load(sc, "/home/team016/middata/stage2/model80/lr/" + cookieid)
-              val dtmodel = DecisionTreeModel.load(sc, "/home/team016/middata/stage2/model80/dt_new/" + cookieid)
-              val svmmodel = SVMModel.load(sc, "/home/team016/middata/stage2/model80/svm/" + cookieid)
-              
-              val result = train_data.map(_.split("\001"))
-                                       .map { values => 
-                                               val action = values(3)
-                                               val position = Position(values.slice(5,28))
-                                               val enterprice = Enterprise(values.slice(28, 49))
-                                               position.enterprise = enterprice
-                                               (position.infoid, label(action), position.lrFeatures(blocals.value, bjobcates.value)) }
-                                        .toLocalIterator
-                                        .map { case (infoid, label, features) => 
-                                                 (infoid, 
-                                                  label, 
-                                                  util.logistic(util.vecdot(lrmodel.weights.toArray, features)), 
-                                                  dtmodel.predict(Vectors.dense(features)),
-                                                  util.vecdot(svmmodel.weights.toArray, features)) }
-                                        .map { case (infoid, label, lrscore, dtscore, svmscore) => 
-                                                 Array(cookieid, infoid, lrscore, dtscore, svmscore, label).mkString("\t") }
-              sc.parallelize(result.toSeq).saveAsTextFile("/home/team016/middata/stage2/train_result/lrdtsvmbyuser/" + cookieid)
-            } finally {
-                bjobcates.destroy()
-                blocals.destroy()
-            }
-            cookieid
-          }
-        })
-    }.map { f => f.get }
   }
   
   def label(action: String) =
@@ -810,16 +710,15 @@ object Evaluate
       svmEvaluate(sc)
       
     if (args(0).toUpperCase() == "LRDTSVM_TRAIN_PART")
-      lrdtsvmEvaluateTraindataPart(sc, args(1).toInt)
+      lrdtsvmEvaluateTraindataPart(sc, 
+          "/home/team016/middata/stage2/test_cookies_split10/part" + args(1), 
+          "/home/team016/middata/stage2/train_result/lrdtsvmbyuser/part" + args(1))
     
     if (args(0).toUpperCase() == "CLICK_TRAIN")
       clickEvaluateTrainDataAll(sc)
       
     if (args(0).toUpperCase() == "CF_TRAIN")
       cfEvaluateTrainData(sc)
-      
-    if (args(0).toUpperCase() == "LRSVM_TRAIN_PART")
-      lrsvmEvaluateTraindataAll(sc)
       
     if (args(0) == "Comprehensive") {
       evaluateComprehensive(sc)
