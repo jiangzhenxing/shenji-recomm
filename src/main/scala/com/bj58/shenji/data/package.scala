@@ -9,6 +9,4 @@ package com.bj58.shenji
  * @author jiangzhenxing
  * @date 2016-10-31
  */
-package com.bj58.shenji.data {
-  
-}
+package com.bj58.shenji.data
