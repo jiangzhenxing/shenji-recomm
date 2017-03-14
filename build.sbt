@@ -15,6 +15,5 @@ lazy val root = project.in(file(".")).
   	settings(
   		javacOptions ++= Seq("-source", "1.6", "-target", "1.6"),
   		// scalacOptions += "-target:jvm-1.6",
-		libraryDependencies ++= dependencies,
-		XitrumPackage.copy() // xitrum-package
+		libraryDependencies ++= dependencies
 	)
